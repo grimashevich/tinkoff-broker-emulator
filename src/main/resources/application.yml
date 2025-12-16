@@ -1,0 +1,19 @@
+emulator:
+  instrument:
+    ticker: "TBRU"
+    uid: "e8acd2fb-6de6-4ea4-9bfb-0daad9b2ed7b"
+    figi: "TCS60A1039N1"
+    lot: 1
+    min-price-increment: 0.01
+    currency: "RUB"
+  
+  orderbook:
+    initial-bid: 7.69
+    initial-ask: 7.70
+    depth: 10
+  
+  account:
+    id: "mock-account-001"
+    initial-balance: 200000.00
+    margin-multiplier-buy: 7.0
+    margin-multiplier-sell: 7.1
