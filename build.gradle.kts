@@ -16,6 +16,7 @@ repositories {
 }
 
 dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE")
@@ -28,6 +29,8 @@ dependencies {
     testImplementation("io.grpc:grpc-testing:1.62.2")
     testImplementation("org.mockito:mockito-core")
     testImplementation("org.mockito:mockito-junit-jupiter")
+    testImplementation("org.testcontainers:junit-jupiter:1.19.7")
+    testImplementation("org.testcontainers:docker-compose:1.19.7")
 }
 
 protobuf {
