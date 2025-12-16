@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tinkoff Broker Emulator Admin</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --card-bg: #1e1e1e;
+            --bid-color: #00c853;
+            --ask-color: #ff5252;
+            --border-color: #333;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 100%;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;}
+        
+        /* Order Book */
+        .order-book-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+        .order-book-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        .order-book-table th, .order-book-table td {
+            padding: 4px 8px;
+            text-align: right;
+        }
+        .order-book-table th { text-align: center; color: #888; }
+        .ask-row { color: var(--ask-color); }
+        .bid-row { color: var(--bid-color); }
+        .price-col { font-weight: bold; }
+        
+        /* Forms */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #aaa; }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            background: #2c2c2c;
+            border: 1px solid var(--border-color);
+            color: white;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .btn-buy { background-color: var(--bid-color); color: white; }
+        .btn-sell { background-color: var(--ask-color); color: white; }
+        .btn-cancel { background-color: #d32f2f; color: white; padding: 4px 8px; font-size: 0.8rem; width: auto;}
+
+        /* Orders List */
+        .orders-list { overflow-y: auto; flex-grow: 1; }
+        .orders-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .orders-table th { text-align: left; border-bottom: 1px solid var(--border-color); padding: 8px; }
+        .orders-table td { border-bottom: 1px solid #333; padding: 8px; }
+        
+        .right-panel { display: flex; flex-direction: column; gap: 20px; }
+        .account-info { font-family: monospace; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Left: Order Book -->
+    <div class="card">
+        <h2>Order Book (TBRU)</h2>
+        <div class="order-book-container">
+            <table class="order-book-table">
+                <thead>
+                    <tr>
+                        <th>Vol</th>
+                        <th>Price</th>
+                        <th>My</th>
+                    </tr>
+                </thead>
+                <tbody id="asks-body"></tbody>
+                <tbody>
+                    <tr><td colspan="3" style="text-align: center; color: #666; padding: 5px;">--- Spread ---</td></tr>
+                </tbody>
+                <tbody id="bids-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Right: Controls -->
+    <div class="right-panel">
+        <!-- Account Info -->
+        <div class="card" style="flex: 0 0 auto;">
+            <h2>Bot Account</h2>
+            <div id="account-info" class="account-info">Loading...</div>
+        </div>
+
+        <!-- Trade Form -->
+        <div class="card" style="flex: 0 0 auto;">
+            <h2>Place Order (Market Participant)</h2>
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Price</label>
+                    <input type="number" id="price" step="0.01" value="100.00">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Quantity</label>
+                    <input type="number" id="quantity" value="10">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select id="type">
+                    <option value="LIMIT">Limit</option>
+                    <option value="MARKET">Market</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-buy" onclick="placeOrder('BUY')">Buy</button>
+                <button class="btn btn-sell" onclick="placeOrder('SELL')">Sell</button>
+            </div>
+        </div>
+
+        <!-- Active Orders -->
+        <div class="card" style="flex: 1;">
+            <h2>Active Orders</h2>
+            <div class="orders-list">
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Side</th>
+                            <th>Price</th>
+                            <th>Qty</th>
+                            <th>Filled</th>
+                            <th>Source</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // State
+    let orderBook = { bids: [], asks: [] };
+    
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchAccount();
+        fetchOrders();
+        fetchOrderBook();
+        connectWs();
+        
+        // Polling for orders and account (simple alternative to full event stream for MVP)
+        setInterval(fetchOrders, 2000);
+        setInterval(fetchAccount, 5000);
+    });
+
+    // API Calls
+    async function fetchAccount() {
+        try {
+            const res = await fetch('/api/account');
+            const data = await res.json();
+            const pos = Object.values(data.positions).map(p => `${p.instrumentId}: ${p.quantity} @ ${p.averagePrice}`).join(', ');
+            document.getElementById('account-info').innerHTML = `
+                Balance: ${data.balance.toFixed(2)} RUB<br>
+                Positions: ${pos || 'None'}
+            `;
+        } catch(e) { console.error(e); }
+    }
+
+    async function fetchOrders() {
+        try {
+            const res = await fetch('/api/orders');
+            const orders = await res.json();
+            renderOrders(orders);
+        } catch(e) { console.error(e); }
+    }
+    
+    async function fetchOrderBook() {
+        try {
+            const res = await fetch('/api/orderbook');
+            const data = await res.json();
+            renderOrderBook(data);
+        } catch(e) { console.error(e); }
+    }
+
+    async function placeOrder(direction) {
+        const price = document.getElementById('price').value;
+        const quantity = document.getElementById('quantity').value;
+        const type = document.getElementById('type').value;
+
+        const body = {
+            direction: direction,
+            orderType: type,
+            price: parseFloat(price),
+            quantity: parseInt(quantity),
+            instrumentId: 'TBRU' // Hardcoded for MVP
+        };
+
+        try {
+            const res = await fetch('/api/orders', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+            if(res.ok) {
+                // Flash success?
+                fetchOrders();
+                fetchAccount(); // Update balance potentially
+            } else {
+                alert('Failed to place order');
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    async function cancelOrder(id) {
+        try {
+            await fetch(`/api/orders/${id}`, { method: 'DELETE' });
+            fetchOrders();
+        } catch(e) { console.error(e); }
+    }
+
+    // WebSocket
+    function connectWs() {
+        const ws = new WebSocket(`ws://${location.host}/ws/orderbook`);
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'ORDERBOOK_UPDATE') {
+                renderOrderBook(msg.data);
+            }
+        };
+        ws.onclose = () => setTimeout(connectWs, 1000);
+    }
+
+    // Rendering
+    function renderOrderBook(data) {
+        // Sort: Asks ascending (lowest first), Bids descending (highest first)
+        // But for display: Asks should be descending (High -> Low) visually stacking up?
+        // Standard terminal:
+        // Asks (Red):
+        // 102
+        // 101
+        // 100
+        // -----
+        // 99
+        // 98
+        // Bids (Green)
+        
+        // Data comes as sorted lists usually.
+        // Asks: sorted by price asc (100, 101, 102). We want to reverse for display (102, 101, 100).
+        const asks = [...data.asks].reverse(); 
+        const bids = data.bids; // Descending (100, 99)
+
+        const asksHtml = asks.map(lvl => `
+            <tr class="ask-row">
+                <td>${lvl.quantity}</td>
+                <td class="price-col">${lvl.price.toFixed(2)}</td>
+                <td>${lvl.ordersCount > 0 ? '(' + lvl.ordersCount + ')' : ''}</td>
+            </tr>
+        `).join('');
+        
+        const bidsHtml = bids.map(lvl => `
+            <tr class="bid-row">
+                <td>${lvl.quantity}</td>
+                <td class="price-col">${lvl.price.toFixed(2)}</td>
+                <td>${lvl.ordersCount > 0 ? '(' + lvl.ordersCount + ')' : ''}</td>
+            </tr>
+        `).join('');
+
+        document.getElementById('asks-body').innerHTML = asksHtml;
+        document.getElementById('bids-body').innerHTML = bidsHtml;
+    }
+
+    function renderOrders(orders) {
+        const html = orders.map(o => `
+            <tr>
+                <td>${o.id.substring(0,8)}...</td>
+                <td style="color: ${o.direction === 'BUY' ? 'var(--bid-color)' : 'var(--ask-color)'}">${o.direction}</td>
+                <td>${o.price.toFixed(2)}</td>
+                <td>${o.quantity} / ${o.filledQuantity}</td>
+                <td>${o.filledQuantity}</td>
+                <td>${o.source}</td>
+                <td>
+                    ${o.status === 'NEW' || o.status === 'PARTIALLY_FILLED' ? 
+                      `<button class="btn btn-cancel" onclick="cancelOrder('${o.id}')">X</button>` : o.status}
+                </td>
+            </tr>
+        `).join('');
+        document.getElementById('orders-body').innerHTML = html;
+    }
+</script>
+
+</body>
+</html>

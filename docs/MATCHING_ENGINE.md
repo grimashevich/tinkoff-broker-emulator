@@ -24,7 +24,7 @@
 
 1. **Приоритет по размеру**: Крупные заявки получают бо́льшую долю исполнения
 2. **Округление вниз**: Всегда используется floor(), чтобы не исполнить больше, чем доступно
-3. **Распределение остатков**: Нераспределённые лоты (хвосты) идут по FIFO
+3. **Распределение остатков**: Нераспределённые лоты (хвосты) идут по FIFO (Round Robin по 1 лоту)
 4. **Частичное исполнение**: Заявка может быть исполнена частично
 
 ---
@@ -221,18 +221,19 @@ private List<Trade> executeProRataOnLevel(
         distributed += proRataShare;
     }
     
-    // Этап 2: Распределение хвоста по FIFO
+    // Этап 2: Распределение хвоста по FIFO (Round Robin)
     long tail = quantityToExecute - distributed;
-    for (Order passiveOrder : ordersOnLevel) {
-        if (tail <= 0) break;
-        
-        long currentAlloc = allocations.get(passiveOrder);
-        long maxCanAdd = passiveOrder.getRemainingQuantity() - currentAlloc;
-        long toAdd = Math.min(tail, maxCanAdd);
-        
-        if (toAdd > 0) {
-            allocations.put(passiveOrder, currentAlloc + toAdd);
-            tail -= toAdd;
+    while (tail > 0) {
+        for (Order passiveOrder : ordersOnLevel) {
+            if (tail <= 0) break;
+            
+            long currentAlloc = allocations.get(passiveOrder);
+            long maxCanAdd = passiveOrder.getRemainingQuantity() - currentAlloc;
+            
+            if (maxCanAdd > 0) {
+                allocations.put(passiveOrder, currentAlloc + 1);
+                tail--;
+            }
         }
     }
     
@@ -251,7 +252,7 @@ private List<Trade> executeProRataOnLevel(
             
             // Удаление полностью исполненной заявки
             if (passiveOrder.isFullyFilled()) {
-                level.removeOrder(passiveOrder);
+                // Remove from index and level
             }
         }
     }
