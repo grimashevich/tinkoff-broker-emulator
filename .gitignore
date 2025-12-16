@@ -1,0 +1,199 @@
+cat > .gitignore << 'EOF'
+# ==========================================
+# Java и компилированные файлы
+# ==========================================
+
+# Скомпилированные Java классы
+*.class
+
+# Скомпилированные пакеты
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Логи
+*.log
+*.log.*
+
+# BlueJ файлы (учебная IDE)
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Crash logs и отчеты
+hs_err_pid*
+replay_pid*
+
+# ==========================================
+# Build системы
+# ==========================================
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle/
+build/
+gradle/
+*.gradle
+!gradle/wrapper/gradle-wrapper.jar
+
+# ==========================================
+# IntelliJ IDEA / JetBrains
+# ==========================================
+
+# IDE конфигурация
+.idea/
+.idea_modules/
+*.iml
+*.iws
+*.ipr
+out/
+
+# User-specific файлы
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+
+# AWS
+.idea/**/aws.xml
+
+# Базы данных и источники данных
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+
+# SonarLint
+.idea/sonarlint/
+.idea/sonarlint.xml
+
+# Crashlytics
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+# Rest Client
+.idea/httpRequests
+
+# Кеш
+.idea/caches/
+
+# ==========================================
+# Eclipse IDE
+# ==========================================
+
+.classpath
+.project
+.settings/
+.metadata
+bin/
+tmp/
+*.tmp
+
+# ==========================================
+# VS Code
+# ==========================================
+
+.vscode/
+.classpath
+.factorypath
+.project
+.settings/
+*.code-workspace
+
+# ==========================================
+# IDE файлы (различные редакторы)
+# ==========================================
+
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ==========================================
+# OS файлы
+# ==========================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+.directory
+
+# ==========================================
+# Разработка и тестирование
+# ==========================================
+
+# Сгенерированный код
+generated/
+generated-sources/
+
+# Временные файлы тестов
+.jacoco.*
+jacoco.exec
+
+# Report файлы
+coverage/
+*.hprof
+
+# ==========================================
+# Зависимости (если скачиваются локально)
+# ==========================================
+
+lib/
+libs/
+
+# ==========================================
+# Misc файлы
+# ==========================================
+
+# Локальные конфигурации
+local.properties
+local.conf
+*.local
+
+# Ключи и токены (ВАЖНО: никогда не коммитить!)
+.env
+.env.local
+*.key
+*.pem
+credentials.json
+private_key.*
+
+# IDE-generated структуры
+cmake-build-*/
+EOF
