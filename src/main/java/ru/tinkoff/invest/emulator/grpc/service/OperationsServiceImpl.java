@@ -66,7 +66,7 @@ public class OperationsServiceImpl extends OperationsServiceImplBase {
     private PortfolioPosition mapPosition(Position p, BigDecimal currentPrice) {
         return PortfolioPosition.newBuilder()
                 .setFigi(p.getInstrumentId())
-                .setInstrumentType("share")
+                .setInstrumentType("bond")
                 .setQuantity(GrpcMapper.toQuotation(BigDecimal.valueOf(p.getQuantity())))
                 .setAveragePositionPrice(GrpcMapper.toMoneyValue(p.getAveragePrice(), "RUB"))
                 .setCurrentPrice(GrpcMapper.toMoneyValue(currentPrice, "RUB"))
@@ -77,7 +77,7 @@ public class OperationsServiceImpl extends OperationsServiceImplBase {
         return PositionsSecurities.newBuilder()
                 .setFigi(p.getInstrumentId())
                 .setBalance(p.getQuantity())
-                .setInstrumentType("share")
+                .setInstrumentType("bond")
                 .build();
     }
 }

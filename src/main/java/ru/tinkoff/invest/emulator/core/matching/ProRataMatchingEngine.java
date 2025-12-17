@@ -118,6 +118,8 @@ public class ProRataMatchingEngine {
                 Trade trade = Trade.builder()
                         .id(UUID.randomUUID())
                         .aggressorOrderId(aggressorOrder.getId())
+                        .aggressorOrderSource(aggressorOrder.getSource())
+                        .aggressorDirection(aggressorOrder.getDirection())
                         .passiveOrderId(passiveOrder.getId())
                         .passiveAccountId(passiveOrder.getAccountId())
                         .passiveOrderSource(passiveOrder.getSource())

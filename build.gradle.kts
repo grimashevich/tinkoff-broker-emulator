@@ -30,7 +30,6 @@ dependencies {
     testImplementation("org.mockito:mockito-core")
     testImplementation("org.mockito:mockito-junit-jupiter")
     testImplementation("org.testcontainers:junit-jupiter:1.19.7")
-    testImplementation("org.testcontainers:docker-compose:1.19.7")
 }
 
 protobuf {

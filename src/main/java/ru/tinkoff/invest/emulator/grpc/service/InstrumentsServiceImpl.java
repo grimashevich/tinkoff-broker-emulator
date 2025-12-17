@@ -32,7 +32,7 @@ public class InstrumentsServiceImpl extends InstrumentsServiceImplBase {
                     .setFigi(inst.getFigi())
                     .setUid(inst.getUid())
                     .setName("Tinkoff Broker Emulator Instrument")
-                    .setInstrumentType("share")
+                    .setInstrumentType("bond")
                     .setClassCode("TQBR")
                     .setApiTradeAvailableFlag(true)
                     .build());

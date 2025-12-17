@@ -67,22 +67,6 @@ public class OrdersServiceImpl extends OrdersServiceImplBase {
             
             List<Trade> trades = matchingEngine.executeOrder(order);
             
-            // ... (rest of method)
-            
-            // Update Account based on trades
-            for (Trade trade : trades) {
-                 // Update account for Aggressor (current order)
-                 // Assumption: Aggressor is always API/Bot order in this method (PostOrder)
-                 boolean isAggressorBuy = order.getDirection() == OrderDirection.BUY;
-                 accountManager.updateState(trade.getInstrumentId(), trade.getQuantity(), trade.getPrice(), isAggressorBuy);
-                 
-                 // Update account for Passive order if it belongs to the Bot (API)
-                 if (trade.getPassiveOrderSource() == OrderSource.API) {
-                     boolean isPassiveBuy = !isAggressorBuy;
-                     accountManager.updateState(trade.getInstrumentId(), trade.getQuantity(), trade.getPrice(), isPassiveBuy);
-                 }
-            }
-            
             // If Limit and not fully filled, add remainder to book
             if (order.getType() == OrderType.LIMIT && !order.isFullyFilled()) {
                 orderBookManager.addOrder(order);
@@ -100,6 +84,7 @@ public class OrdersServiceImpl extends OrdersServiceImplBase {
                     .setOrderType(request.getOrderType())
                     .setFigi(request.getInstrumentId())
                     .build();
+
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
@@ -176,7 +161,10 @@ public class OrdersServiceImpl extends OrdersServiceImplBase {
         
         GetMaxLotsResponse response = GetMaxLotsResponse.newBuilder()
                 .setCurrency("RUB")
-                .setBuyLimits(GetMaxLotsResponse.BuyLimitsView.newBuilder().setBuyMaxLots(maxBuy).build())
+                .setBuyLimits(GetMaxLotsResponse.BuyLimitsView.newBuilder()
+                        .setBuyMaxLots(maxBuy)
+                        .setBuyMaxMarketLots(maxBuy)
+                        .build())
                 .setBuyMarginLimits(GetMaxLotsResponse.BuyLimitsView.newBuilder().setBuyMaxLots(maxBuy).build()) // Same for now
                 .setSellLimits(GetMaxLotsResponse.SellLimitsView.newBuilder().setSellMaxLots(maxSell).build())
                 .setSellMarginLimits(GetMaxLotsResponse.SellLimitsView.newBuilder().setSellMaxLots(maxSell).build())

@@ -42,6 +42,7 @@ public class EmulatorIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        orderBookManager.clear();
         channel = ManagedChannelBuilder.forAddress("localhost", 9090)
                 .usePlaintext()
                 .build();

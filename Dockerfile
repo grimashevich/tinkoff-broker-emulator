@@ -11,4 +11,4 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /home/gradle/src/build/libs/*.jar app.jar
 EXPOSE 8080 50051
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar", "--spring.config.location=optional:classpath:/,optional:file:/app/config/"]

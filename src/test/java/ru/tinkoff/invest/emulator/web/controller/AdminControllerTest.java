@@ -7,6 +7,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import ru.tinkoff.invest.emulator.core.orderbook.OrderBookManager;
+import org.junit.jupiter.api.BeforeEach;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -21,6 +23,14 @@ class AdminControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private OrderBookManager orderBookManager;
+
+    @BeforeEach
+    void setUp() {
+        orderBookManager.clear();
+    }
 
     @Test
     void testGetOrderBook() throws Exception {

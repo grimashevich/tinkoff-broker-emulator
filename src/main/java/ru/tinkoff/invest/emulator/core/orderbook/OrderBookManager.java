@@ -7,7 +7,11 @@ import ru.tinkoff.invest.emulator.config.EmulatorProperties;
 import ru.tinkoff.invest.emulator.core.event.OrderBookChangedEvent;
 import ru.tinkoff.invest.emulator.core.model.Order;
 import ru.tinkoff.invest.emulator.core.model.OrderBook;
+import ru.tinkoff.invest.emulator.core.model.OrderDirection;
+import ru.tinkoff.invest.emulator.core.model.OrderSource;
+import ru.tinkoff.invest.emulator.core.model.OrderType;
 import ru.tinkoff.invest.emulator.core.model.PriceLevel;
+import jakarta.annotation.PostConstruct;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -21,10 +25,63 @@ public class OrderBookManager {
     private final Map<UUID, Order> orderIndex = new HashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     private final ApplicationEventPublisher eventPublisher;
+    private final EmulatorProperties properties;
 
     public OrderBookManager(EmulatorProperties properties, ApplicationEventPublisher eventPublisher) {
         this.orderBook = new OrderBook(properties.getInstrument().getUid());
         this.eventPublisher = eventPublisher;
+        this.properties = properties;
+    }
+
+    @PostConstruct
+    public void init() {
+        BigDecimal initialBid = properties.getOrderbook().getInitialBid();
+        BigDecimal initialAsk = properties.getOrderbook().getInitialAsk();
+        String instrumentId = properties.getInstrument().getUid();
+
+        // Создаём начальные заявки от маркет-мейкера (не от бота!)
+        if (initialBid != null) {
+            Order bidOrder = Order.builder()
+                    .id(UUID.randomUUID())
+                    .instrumentId(instrumentId)
+                    .accountId("market-maker-init")
+                    .direction(OrderDirection.BUY)
+                    .type(OrderType.LIMIT)
+                    .price(initialBid)
+                    .quantity(1000)  // Начальный объём
+                    .source(OrderSource.ADMIN_PANEL)
+                    .build();
+            addOrder(bidOrder);
+        }
+
+        if (initialAsk != null) {
+            Order askOrder = Order.builder()
+                    .id(UUID.randomUUID())
+                    .instrumentId(instrumentId)
+                    .accountId("market-maker-init")
+                    .direction(OrderDirection.SELL)
+                    .type(OrderType.LIMIT)
+                    .price(initialAsk)
+                    .quantity(1000)
+                    .source(OrderSource.ADMIN_PANEL)
+                    .build();
+            addOrder(askOrder);
+        }
+
+        log.info("OrderBook initialized with bid={}, ask={}", initialBid, initialAsk);
+    }
+
+    public void clear() {
+        lock.writeLock().lock();
+        try {
+            orderBook.getBids().clear();
+            orderBook.getAsks().clear();
+            orderIndex.clear();
+            log.info("OrderBook cleared for test");
+            publishEvent();
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     public void addOrder(Order order) {

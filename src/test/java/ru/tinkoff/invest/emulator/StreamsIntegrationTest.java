@@ -33,6 +33,9 @@ public class StreamsIntegrationTest {
     @Autowired
     private EmulatorProperties properties;
     
+    @Autowired
+    private OrderBookManager orderBookManager;
+    
     private ManagedChannel channel;
     private MarketDataStreamServiceGrpc.MarketDataStreamServiceStub marketDataStreamStub;
     private OrdersServiceGrpc.OrdersServiceBlockingStub ordersStub;
@@ -40,6 +43,7 @@ public class StreamsIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        orderBookManager.clear();
         channel = ManagedChannelBuilder.forAddress("localhost", 9095)
                 .usePlaintext()
                 .build();

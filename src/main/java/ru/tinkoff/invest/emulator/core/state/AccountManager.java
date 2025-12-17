@@ -12,6 +12,11 @@ import jakarta.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.util.List;
 
+import ru.tinkoff.invest.emulator.core.event.TradeExecutedEvent;
+import ru.tinkoff.invest.emulator.core.model.OrderDirection;
+import ru.tinkoff.invest.emulator.core.model.OrderSource;
+import org.springframework.context.event.EventListener;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -26,6 +31,23 @@ public class AccountManager {
                 properties.getAccount().getInitialBalance()
         );
         log.info("Initialized account {} with balance {}", account.getId(), account.getBalance());
+    }
+
+    @EventListener
+    public void onTradeExecuted(TradeExecutedEvent event) {
+        Trade trade = event.getTrade();
+
+        // Обновляем аккаунт только если одна из сторон сделки — заявка бота (API)
+        if (trade.getAggressorOrderSource() == OrderSource.API) {
+            boolean isBuy = trade.getAggressorDirection() == OrderDirection.BUY;
+            updateState(trade.getInstrumentId(), trade.getQuantity(), trade.getPrice(), isBuy);
+        }
+
+        if (trade.getPassiveOrderSource() == OrderSource.API) {
+            // Пассивная сторона — противоположное направление от агрессора
+            boolean isBuy = trade.getAggressorDirection() != OrderDirection.BUY;
+            updateState(trade.getInstrumentId(), trade.getQuantity(), trade.getPrice(), isBuy);
+        }
     }
 
     public Account getAccount() {
