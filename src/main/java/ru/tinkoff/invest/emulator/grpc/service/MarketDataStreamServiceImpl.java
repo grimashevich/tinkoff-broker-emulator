@@ -5,7 +5,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import ru.tinkoff.invest.emulator.core.event.OrderBookChangedEvent;
+import ru.tinkoff.invest.emulator.core.orderbook.OrderBookManager;
 import ru.tinkoff.invest.emulator.core.stream.StreamManager;
 import ru.tinkoff.invest.emulator.grpc.mapper.GrpcMapper;
 import ru.tinkoff.piapi.contract.v1.*;
@@ -21,6 +23,7 @@ import java.util.stream.Collectors;
 public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase {
 
     private final StreamManager streamManager;
+    private final OrderBookManager orderBookManager;
 
     @Override
     public StreamObserver<MarketDataRequest> marketDataStream(StreamObserver<MarketDataResponse> responseObserver) {
@@ -107,5 +110,33 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
                      .build());
         }
         return result;
+    }
+
+    /**
+     * Периодическая отправка стакана для поддержания активности стрима.
+     * SDK T-Invest отменяет стрим при отсутствии данных ~15 секунд.
+     */
+    @Scheduled(fixedRate = 5000)
+    public void sendPeriodicOrderBook() {
+        ru.tinkoff.invest.emulator.core.model.OrderBook coreBook = orderBookManager.getSnapshot(50);
+        if (coreBook == null) {
+            return;
+        }
+
+        OrderBook ob = OrderBook.newBuilder()
+                .setFigi(coreBook.getInstrumentId())
+                .setDepth(50)
+                .setIsConsistent(true)
+                .setTime(GrpcMapper.toTimestamp(Instant.now()))
+                .addAllBids(mapOrders(coreBook.getBids().values()))
+                .addAllAsks(mapOrders(coreBook.getAsks().values()))
+                .setInstrumentUid(coreBook.getInstrumentId())
+                .build();
+
+        MarketDataResponse response = MarketDataResponse.newBuilder()
+                .setOrderbook(ob)
+                .build();
+
+        streamManager.broadcastOrderBook(coreBook.getInstrumentId(), response);
     }
 }

@@ -96,4 +96,20 @@ public class OperationsServiceImpl extends OperationsServiceImplBase {
                 .setInstrumentType("bond")
                 .build();
     }
+
+    @Override
+    public void getOperationsByCursor(GetOperationsByCursorRequest request,
+                                       StreamObserver<GetOperationsByCursorResponse> responseObserver) {
+        log.info("GRPC GetOperationsByCursor: accountId={}, from={}, to={}",
+                request.getAccountId(), request.getFrom(), request.getTo());
+
+        // Возвращаем пустой список операций (заглушка для sandbox режима)
+        GetOperationsByCursorResponse response = GetOperationsByCursorResponse.newBuilder()
+                .setHasNext(false)
+                .setNextCursor("")
+                .build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
 }
