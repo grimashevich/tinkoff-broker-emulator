@@ -32,7 +32,10 @@ public class AdminController {
 
     @GetMapping("/orderbook")
     public OrderBookDto getOrderBook() {
+        log.debug("REST GetOrderBook: Fetching orderbook snapshot");
         OrderBook book = orderBookManager.getSnapshot(20);
+        log.debug("REST GetOrderBook: bids={} levels, asks={} levels",
+                book.getBids().size(), book.getAsks().size());
         return OrderBookDto.builder()
                 .instrumentId(book.getInstrumentId())
                 .depth(20)
@@ -56,18 +59,11 @@ public class AdminController {
 
     @GetMapping("/orders")
     public List<OrderDto> getOrders() {
-        // Return all orders from all accounts for Admin
-        // OrderBookManager has `getOrders(accountId)`.
-        // We probably need `getAllOrders()`?
-        // Or we can iterate over orderIndex if we expose it (unlikely).
-        // Let's rely on account-based retrieval for now or assume single instrument and fetch from book + internal tracking?
-        // `OrderBookManager` only keeps active orders in the book.
-        // If we want history, we need a separate OrderRepository.
-        // For active orders, we can get active orders from Book.
-        // `OrderBookManager` has `orderIndex`.
-        // I should expose `getAllOrders` in `OrderBookManager` for Admin.
-        
-        return orderBookManager.getAllOrders().stream()
+        log.debug("REST GetOrders: Fetching all active orders");
+        List<Order> orders = orderBookManager.getAllOrders();
+        log.debug("REST GetOrders: Found {} active orders", orders.size());
+
+        return orders.stream()
                 .map(this::mapOrder)
                 .sorted(Comparator.comparing(OrderDto::getId)) // Stability
                 .collect(Collectors.toList());
@@ -75,9 +71,12 @@ public class AdminController {
 
     @PostMapping("/orders")
     public OrderDto createOrder(@RequestBody CreateOrderRequest request) {
+        log.info("REST CreateOrder [ADMIN_PANEL]: {} {} @ {} qty={}",
+                request.getDirection(), request.getOrderType(), request.getPrice(), request.getQuantity());
+
         String instrumentId = request.getInstrumentId() != null ? request.getInstrumentId() : properties.getInstrument().getUid();
         String accountId = request.getAccountId() != null ? request.getAccountId() : "admin-market-maker";
-        
+
         Order order = Order.builder()
                 .id(UUID.randomUUID())
                 .instrumentId(instrumentId)
@@ -89,55 +88,53 @@ public class AdminController {
                 .source(OrderSource.ADMIN_PANEL)
                 .build();
 
-        // Admin orders also go through matching engine to execute against Bot orders
-        // Need to publish NEW event? The matching engine logic I updated earlier handles execution events.
-        // But initial creation? 
-        // OrdersServiceImpl publishes NEW. AdminController should too for consistency if we use event stream.
-        // But for MVP admin panel, maybe not critical.
-        
+        log.debug("REST CreateOrder: Created order {} for account {}", order.getId(), accountId);
+
         List<Trade> trades = matchingEngine.executeOrder(order);
-        
-        // Update Admin/MarketMaker account state? 
-        // We can, but mostly we care about the Bot's account being updated if it matched.
-        // The Bot's account is updated in `OrdersServiceImpl` logic if Bot is aggressor.
-        // If Admin is aggressor and Bot is passive, who updates Bot's account?
-        // `OrdersServiceImpl` logic:
-        // "Update account for Passive order if it belongs to the Bot (API)"
-        // Wait, that logic was inside `OrdersServiceImpl.postOrder`.
-        // `AdminController` calls `MatchingEngine` DIRECTLY.
-        // So `OrdersServiceImpl` logic is NOT executed!
-        // We need to duplicate the "Update Passive Bot Order" logic here or extract it.
-        // IMPORTANT: If Admin hits a passive Bot order, Bot's account MUST be updated.
-        
+
+        log.info("REST CreateOrder: Order {} executed with {} trades, remaining={}",
+                order.getId(), trades.size(), order.getRemainingQuantity());
+
+        // Update Bot account if Admin hit passive Bot orders
         for (Trade trade : trades) {
              if (trade.getPassiveOrderSource() == OrderSource.API) {
                  boolean isAggressorBuy = order.getDirection() == OrderDirection.BUY;
                  boolean isPassiveBuy = !isAggressorBuy;
+                 log.debug("REST CreateOrder: Updating Bot account for passive fill: {} lots @ {}",
+                         trade.getQuantity(), trade.getPrice());
                  accountManager.updateState(trade.getInstrumentId(), trade.getQuantity(), trade.getPrice(), isPassiveBuy);
              }
         }
-        
+
         // If Limit and remainder, add to book
         if (order.getType() == OrderType.LIMIT && !order.isFullyFilled()) {
+            log.debug("REST CreateOrder: Adding remainder {} lots to orderbook at {}",
+                    order.getRemainingQuantity(), order.getPrice());
             orderBookManager.addOrder(order);
         }
-        
+
         return mapOrder(order);
     }
 
     @DeleteMapping("/orders/{id}")
     public ResponseEntity<Void> cancelOrder(@PathVariable String id) {
+        log.info("REST CancelOrder: id={}", id);
         boolean removed = orderBookManager.removeOrder(UUID.fromString(id));
         if (removed) {
+            log.info("REST CancelOrder: Order {} successfully removed", id);
             return ResponseEntity.ok().build();
         } else {
+            log.warn("REST CancelOrder: Order {} not found in orderbook", id);
             return ResponseEntity.notFound().build();
         }
     }
 
     @GetMapping("/account")
     public Account getAccount() {
-        return accountManager.getAccount();
+        Account account = accountManager.getAccount();
+        log.debug("REST GetAccount: id={}, balance={}, positions={}",
+                account.getId(), account.getBalance(), account.getPositions().size());
+        return account;
     }
 
     private OrderDto mapOrder(Order order) {

@@ -25,6 +25,8 @@ public class OperationsServiceImpl extends OperationsServiceImplBase {
 
     @Override
     public void getPortfolio(PortfolioRequest request, StreamObserver<PortfolioResponse> responseObserver) {
+        log.info("GRPC GetPortfolio: accountId={}", request.getAccountId());
+
         Account account = accountManager.getAccount();
         // Calculate totals
         // We need current price for each position.
@@ -32,33 +34,47 @@ public class OperationsServiceImpl extends OperationsServiceImplBase {
         BigDecimal price = orderBookManager.getBestBid(); // Valuation at Bid? Or last price?
         if (price == null) price = orderBookManager.getBestAsk();
         if (price == null) price = BigDecimal.TEN; // Fallback
-        
+
         final BigDecimal finalPrice = price;
+        BigDecimal portfolioValue = accountManager.getPortfolioValue(finalPrice);
+
+        log.debug("GRPC GetPortfolio: balance={}, positions={}, valuationPrice={}, portfolioValue={}",
+                account.getBalance(), account.getPositions().size(), finalPrice, portfolioValue);
 
         PortfolioResponse response = PortfolioResponse.newBuilder()
-                .setTotalAmountPortfolio(GrpcMapper.toMoneyValue(accountManager.getPortfolioValue(finalPrice), "RUB"))
+                .setTotalAmountPortfolio(GrpcMapper.toMoneyValue(portfolioValue, "RUB"))
                 .setTotalAmountCurrencies(GrpcMapper.toMoneyValue(account.getBalance(), "RUB"))
                 .setAccountId(account.getId())
                 .addAllPositions(account.getPositions().values().stream()
                         .map(p -> mapPosition(p, finalPrice))
                         .collect(Collectors.toList()))
                 .build();
-        
+
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
     @Override
     public void getPositions(PositionsRequest request, StreamObserver<PositionsResponse> responseObserver) {
+        log.info("GRPC GetPositions: accountId={}", request.getAccountId());
+
         Account account = accountManager.getAccount();
-        
+
+        log.debug("GRPC GetPositions: balance={}, securities count={}",
+                account.getBalance(), account.getPositions().size());
+
+        for (Position pos : account.getPositions().values()) {
+            log.debug("GRPC GetPositions: Position instrumentId={}, qty={}, avgPrice={}",
+                    pos.getInstrumentId(), pos.getQuantity(), pos.getAveragePrice());
+        }
+
         PositionsResponse response = PositionsResponse.newBuilder()
                 .addMoney(GrpcMapper.toMoneyValue(account.getBalance(), "RUB"))
                 .addAllSecurities(account.getPositions().values().stream()
                         .map(this::mapSecurity)
                         .collect(Collectors.toList()))
                 .build();
-        
+
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

@@ -20,16 +20,27 @@ public class ProRataMatchingEngine {
     private final ApplicationEventPublisher eventPublisher;
 
     public List<Trade> executeOrder(Order aggressorOrder) {
+        log.info("MATCHING: Starting execution of order {} [{}] {} {} @ {} qty={}",
+                aggressorOrder.getId(),
+                aggressorOrder.getSource(),
+                aggressorOrder.getDirection(),
+                aggressorOrder.getType(),
+                aggressorOrder.getPrice(),
+                aggressorOrder.getQuantity());
+
         orderBookManager.getLock().writeLock().lock();
         boolean bookChanged = false;
         try {
             if (aggressorOrder.getQuantity() <= 0) {
+                log.warn("MATCHING: Order {} has invalid quantity <= 0, skipping", aggressorOrder.getId());
                 return Collections.emptyList();
             }
 
             List<Trade> trades = new ArrayList<>();
             NavigableMap<BigDecimal, PriceLevel> oppositeSide = getOppositeSide(aggressorOrder.getDirection());
-            
+
+            log.debug("MATCHING: Opposite side has {} price levels", oppositeSide.size());
+
             Iterator<Map.Entry<BigDecimal, PriceLevel>> levelIterator = oppositeSide.entrySet().iterator();
 
             while (aggressorOrder.getRemainingQuantity() > 0 && levelIterator.hasNext()) {
@@ -37,11 +48,16 @@ public class ProRataMatchingEngine {
                 BigDecimal levelPrice = entry.getKey();
                 PriceLevel level = entry.getValue();
 
+                log.debug("MATCHING: Checking price level {} with {} orders, total qty={}",
+                        levelPrice, level.getOrdersSortedByTime().size(), level.getTotalQuantity());
+
                 if (aggressorOrder.getType() == OrderType.LIMIT) {
                     if (aggressorOrder.getDirection() == OrderDirection.BUY && levelPrice.compareTo(aggressorOrder.getPrice()) > 0) {
+                        log.debug("MATCHING: BUY limit price {} < ask level {}, stopping", aggressorOrder.getPrice(), levelPrice);
                         break;
                     }
                     if (aggressorOrder.getDirection() == OrderDirection.SELL && levelPrice.compareTo(aggressorOrder.getPrice()) < 0) {
+                        log.debug("MATCHING: SELL limit price {} > bid level {}, stopping", aggressorOrder.getPrice(), levelPrice);
                         break;
                     }
                 }
@@ -49,6 +65,7 @@ public class ProRataMatchingEngine {
                 long quantityToExecute = Math.min(aggressorOrder.getRemainingQuantity(), level.getTotalQuantity());
 
                 if (quantityToExecute > 0) {
+                    log.debug("MATCHING: Executing {} lots at price level {}", quantityToExecute, levelPrice);
                     List<Trade> levelTrades = executeProRataOnLevel(level, quantityToExecute, levelPrice, aggressorOrder);
                     trades.addAll(levelTrades);
                     if (!levelTrades.isEmpty()) {
@@ -57,14 +74,21 @@ public class ProRataMatchingEngine {
                 }
 
                 if (level.isEmpty()) {
+                    log.debug("MATCHING: Price level {} is now empty, removing", levelPrice);
                     levelIterator.remove();
                     bookChanged = true;
                 }
             }
-            
+
             if (bookChanged) {
                 orderBookManager.notifyUpdate();
             }
+
+            log.info("MATCHING: Order {} execution completed: {} trades, remaining qty={}, status={}",
+                    aggressorOrder.getId(),
+                    trades.size(),
+                    aggressorOrder.getRemainingQuantity(),
+                    aggressorOrder.getStatus());
 
             return trades;
         } finally {
@@ -84,17 +108,25 @@ public class ProRataMatchingEngine {
         List<Order> ordersOnLevel = level.getOrdersSortedByTime();
         Map<Order, Long> allocations = new LinkedHashMap<>();
 
+        log.debug("MATCHING: Pro-Rata allocation: {} lots across {} passive orders (total on level={})",
+                quantityToExecute, ordersOnLevel.size(), totalOnLevel);
+
         // Step 1: Pro-Rata
         for (Order passiveOrder : ordersOnLevel) {
             double share = (double) quantityToExecute * passiveOrder.getRemainingQuantity() / totalOnLevel;
             long proRataShare = (long) Math.floor(share);
-            
+
             allocations.put(passiveOrder, proRataShare);
             distributed += proRataShare;
+            log.trace("MATCHING: Pro-Rata order {} [{}]: share={:.2f}, allocated={}",
+                    passiveOrder.getId(), passiveOrder.getSource(), share, proRataShare);
         }
 
         // Step 2: FIFO Tail
         long tail = quantityToExecute - distributed;
+        if (tail > 0) {
+            log.debug("MATCHING: FIFO tail distribution: {} lots remaining after pro-rata", tail);
+        }
         while (tail > 0) {
             for (Order passiveOrder : ordersOnLevel) {
                 if (tail <= 0) break;
@@ -105,6 +137,7 @@ public class ProRataMatchingEngine {
                 if (maxCanAdd > 0) {
                     allocations.put(passiveOrder, currentAlloc + 1);
                     tail--;
+                    log.trace("MATCHING: FIFO +1 to order {}, new alloc={}", passiveOrder.getId(), currentAlloc + 1);
                 }
             }
         }
@@ -128,17 +161,23 @@ public class ProRataMatchingEngine {
                         .quantity(quantity)
                         .build();
                 trades.add(trade);
+
+                log.info("TRADE: {} | aggressor={} [{}] vs passive={} [{}] | {} @ {} | qty={}",
+                        trade.getId(),
+                        aggressorOrder.getId(), aggressorOrder.getSource(),
+                        passiveOrder.getId(), passiveOrder.getSource(),
+                        aggressorOrder.getDirection(), price, quantity);
+
                 eventPublisher.publishEvent(new TradeExecutedEvent(this, trade));
 
                 passiveOrder.fill(quantity);
                 eventPublisher.publishEvent(new OrderStateChangedEvent(this, passiveOrder));
 
                 aggressorOrder.fill(quantity);
-                // Aggressor event usually handled by caller or here?
-                // Caller (PostOrder) handles aggressor logic. But better to fire event here to be consistent.
                 eventPublisher.publishEvent(new OrderStateChangedEvent(this, aggressorOrder));
 
                 if (passiveOrder.isFullyFilled()) {
+                    log.debug("MATCHING: Passive order {} fully filled, removing from book", passiveOrder.getId());
                     level.removeOrder(passiveOrder);
                     orderBookManager.removeOrderIndex(passiveOrder.getId());
                 }

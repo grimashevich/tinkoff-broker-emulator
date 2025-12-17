@@ -120,10 +120,16 @@ public class OrdersServiceImpl extends OrdersServiceImplBase {
 
     @Override
     public void getOrders(GetOrdersRequest request, StreamObserver<GetOrdersResponse> responseObserver) {
+        log.info("GRPC GetOrders: accountId={}", request.getAccountId());
+
         List<Order> orders = orderBookManager.getOrders(request.getAccountId());
-        
+        log.debug("GRPC GetOrders: Found {} active orders for account {}", orders.size(), request.getAccountId());
+
         GetOrdersResponse.Builder builder = GetOrdersResponse.newBuilder();
         for (Order o : orders) {
+            log.trace("GRPC GetOrders: Order {} {} {} @ {} qty={}/{}",
+                    o.getId(), o.getDirection(), o.getType(), o.getPrice(),
+                    o.getFilledQuantity(), o.getQuantity());
             builder.addOrders(OrderState.newBuilder()
                     .setOrderId(o.getId().toString())
                     .setLotsRequested(o.getQuantity())
@@ -135,41 +141,39 @@ public class OrdersServiceImpl extends OrdersServiceImplBase {
                     .setInitialOrderPrice(GrpcMapper.toMoneyValue(o.getPrice().multiply(BigDecimal.valueOf(o.getQuantity())), "RUB"))
                     .build());
         }
-        
+
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 
     @Override
     public void getMaxLots(GetMaxLotsRequest request, StreamObserver<GetMaxLotsResponse> responseObserver) {
+        log.info("GRPC GetMaxLots: accountId={}, instrumentId={}", request.getAccountId(), request.getInstrumentId());
+
         BigDecimal price = request.hasPrice() ? GrpcMapper.toBigDecimal(request.getPrice()) : null;
         if (price == null || price.compareTo(BigDecimal.ZERO) == 0) {
             // Use current market price if not provided
-             // For Buy: use Best Ask (lowest sell price)
-             // For Sell: use Best Bid (highest buy price)
-             // If book empty?
-             price = orderBookManager.getBestAsk(); // Default to Ask for conservative
+             price = orderBookManager.getBestAsk();
              if (price == null) price = orderBookManager.getBestBid();
-             // If still null (empty book), we can't calc max lots accurately.
+             log.debug("GRPC GetMaxLots: No price provided, using market price={}", price);
         }
-        
-        // Split price for buy/sell? Request has single price.
-        // Assuming user provides price they want to trade at.
-        
+
         long maxBuy = accountManager.getMaxLots(true, null, price);
         long maxSell = accountManager.getMaxLots(false, null, price);
-        
+
+        log.debug("GRPC GetMaxLots: price={}, maxBuy={}, maxSell={}", price, maxBuy, maxSell);
+
         GetMaxLotsResponse response = GetMaxLotsResponse.newBuilder()
                 .setCurrency("RUB")
                 .setBuyLimits(GetMaxLotsResponse.BuyLimitsView.newBuilder()
                         .setBuyMaxLots(maxBuy)
                         .setBuyMaxMarketLots(maxBuy)
                         .build())
-                .setBuyMarginLimits(GetMaxLotsResponse.BuyLimitsView.newBuilder().setBuyMaxLots(maxBuy).build()) // Same for now
+                .setBuyMarginLimits(GetMaxLotsResponse.BuyLimitsView.newBuilder().setBuyMaxLots(maxBuy).build())
                 .setSellLimits(GetMaxLotsResponse.SellLimitsView.newBuilder().setSellMaxLots(maxSell).build())
                 .setSellMarginLimits(GetMaxLotsResponse.SellLimitsView.newBuilder().setSellMaxLots(maxSell).build())
                 .build();
-                
+
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

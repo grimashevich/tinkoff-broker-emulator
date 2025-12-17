@@ -24,15 +24,22 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
 
     @Override
     public StreamObserver<MarketDataRequest> marketDataStream(StreamObserver<MarketDataResponse> responseObserver) {
+        log.info("GRPC MarketDataStream: New bidirectional stream established");
+
         return new StreamObserver<>() {
             @Override
             public void onNext(MarketDataRequest request) {
                 if (request.hasSubscribeOrderBookRequest()) {
                     SubscribeOrderBookRequest subReq = request.getSubscribeOrderBookRequest();
+                    log.debug("GRPC MarketDataStream: OrderBook subscription request, action={}, instruments={}",
+                            subReq.getSubscriptionAction(), subReq.getInstrumentsList().size());
+
                     if (subReq.getSubscriptionAction() == SubscriptionAction.SUBSCRIPTION_ACTION_SUBSCRIBE) {
                         for (OrderBookInstrument instr : subReq.getInstrumentsList()) {
+                            log.info("GRPC MarketDataStream: Subscribing to OrderBook for instrument={}, depth={}",
+                                    instr.getInstrumentId(), instr.getDepth());
                             streamManager.addOrderBookSubscription(responseObserver, instr.getInstrumentId());
-                            
+
                             // Confirm subscription
                             responseObserver.onNext(MarketDataResponse.newBuilder()
                                     .setSubscribeOrderBookResponse(SubscribeOrderBookResponse.newBuilder()
@@ -46,7 +53,7 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
                                     .build());
                         }
                     } else {
-                        // Unsubscribe logic if needed
+                        log.info("GRPC MarketDataStream: Unsubscribe request received");
                         streamManager.removeSubscription(responseObserver);
                     }
                 }
@@ -54,12 +61,13 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
 
             @Override
             public void onError(Throwable t) {
-                log.warn("MarketDataStream error: {}", t.getMessage());
+                log.warn("GRPC MarketDataStream: Stream error: {}", t.getMessage());
                 streamManager.removeSubscription(responseObserver);
             }
 
             @Override
             public void onCompleted() {
+                log.info("GRPC MarketDataStream: Client closed stream");
                 streamManager.removeSubscription(responseObserver);
                 responseObserver.onCompleted();
             }
@@ -69,7 +77,10 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
     @EventListener
     public void onOrderBookChanged(OrderBookChangedEvent event) {
         ru.tinkoff.invest.emulator.core.model.OrderBook coreBook = event.getOrderBook();
-        
+
+        log.debug("GRPC MarketDataStream: Broadcasting OrderBook update for instrument={}, bids={}, asks={}",
+                coreBook.getInstrumentId(), coreBook.getBids().size(), coreBook.getAsks().size());
+
         OrderBook ob = OrderBook.newBuilder()
                 .setFigi(coreBook.getInstrumentId())
                 .setDepth(50) // Snapshot default depth
@@ -79,11 +90,11 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
                 .addAllAsks(mapOrders(coreBook.getAsks().values()))
                 .setInstrumentUid(coreBook.getInstrumentId())
                 .build();
-        
+
         MarketDataResponse response = MarketDataResponse.newBuilder()
                 .setOrderbook(ob)
                 .build();
-        
+
         streamManager.broadcastOrderBook(coreBook.getInstrumentId(), response);
     }
     

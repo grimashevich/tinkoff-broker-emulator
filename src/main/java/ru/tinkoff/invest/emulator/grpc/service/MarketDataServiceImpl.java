@@ -24,14 +24,13 @@ public class MarketDataServiceImpl extends MarketDataServiceImplBase {
 
     @Override
     public void getOrderBook(GetOrderBookRequest request, StreamObserver<GetOrderBookResponse> responseObserver) {
-        log.info("GetOrderBook request: instrument_id={}, depth={}", request.getInstrumentId(), request.getDepth());
+        log.info("GRPC GetOrderBook: instrumentId={}, depth={}", request.getInstrumentId(), request.getDepth());
 
-        // We only support one instrument "TBRU" or whatever is in config.
-        // But we just return what we have.
-        // Ideally check instrument ID.
-        
         ru.tinkoff.invest.emulator.core.model.OrderBook coreBook = orderBookManager.getSnapshot(request.getDepth());
-        
+
+        log.debug("GRPC GetOrderBook: Returning {} bid levels, {} ask levels",
+                coreBook.getBids().size(), coreBook.getAsks().size());
+
         GetOrderBookResponse response = GetOrderBookResponse.newBuilder()
                 .setFigi(request.getInstrumentId()) // Echo back
                 .setDepth(request.getDepth())
@@ -40,7 +39,7 @@ public class MarketDataServiceImpl extends MarketDataServiceImplBase {
                 .setInstrumentUid(request.getInstrumentId())
                 .setOrderbookTs(GrpcMapper.toTimestamp(Instant.now()))
                 .build();
-        
+
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

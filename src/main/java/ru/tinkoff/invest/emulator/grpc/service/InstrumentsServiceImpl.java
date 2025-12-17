@@ -18,15 +18,19 @@ public class InstrumentsServiceImpl extends InstrumentsServiceImplBase {
     @Override
     public void findInstrument(FindInstrumentRequest request, StreamObserver<FindInstrumentResponse> responseObserver) {
         String query = request.getQuery();
+        log.info("GRPC FindInstrument: query='{}'", query);
+
         EmulatorProperties.Instrument inst = properties.getInstrument();
-        
+
         // Simple match
-        boolean match = query.equalsIgnoreCase(inst.getTicker()) 
-                     || query.equalsIgnoreCase(inst.getFigi()) 
+        boolean match = query.equalsIgnoreCase(inst.getTicker())
+                     || query.equalsIgnoreCase(inst.getFigi())
                      || query.equalsIgnoreCase(inst.getUid());
 
         FindInstrumentResponse.Builder builder = FindInstrumentResponse.newBuilder();
         if (match) {
+            log.info("GRPC FindInstrument: Match found - ticker={}, figi={}, uid={}",
+                    inst.getTicker(), inst.getFigi(), inst.getUid());
             builder.addInstruments(InstrumentShort.newBuilder()
                     .setTicker(inst.getTicker())
                     .setFigi(inst.getFigi())
@@ -36,8 +40,10 @@ public class InstrumentsServiceImpl extends InstrumentsServiceImplBase {
                     .setClassCode("TQBR")
                     .setApiTradeAvailableFlag(true)
                     .build());
+        } else {
+            log.debug("GRPC FindInstrument: No match for query '{}'", query);
         }
-        
+
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }

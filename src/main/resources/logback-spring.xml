@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+
+    <!-- Timestamp for unique session log file name -->
+    <timestamp key="sessionTimestamp" datePattern="yyyy-MM-dd_HH-mm-ss"/>
+
+    <!-- Property for logs directory -->
+    <property name="LOG_DIR" value="logs"/>
+    <property name="LOG_FILE" value="${LOG_DIR}/emulator_${sessionTimestamp}.log"/>
+
+    <!-- Console Appender with colored output -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%thread] %cyan(%logger{36}) - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- File Appender - unique file per session with rotation (max 50 files) -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_FILE}</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <immediateFlush>true</immediateFlush>
+    </appender>
+
+    <!-- Cleanup old session logs - keep only 50 most recent -->
+    <appender name="FILE_CLEANUP" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/emulator_current.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/archive/emulator_%i.log</fileNamePattern>
+            <minIndex>1</minIndex>
+            <maxIndex>50</maxIndex>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <maxFileSize>100MB</maxFileSize>
+        </triggeringPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Async wrapper for better performance -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- Application loggers -->
+    <logger name="ru.tinkoff.invest.emulator" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_FILE"/>
+    </logger>
+
+    <!-- Core matching engine - detailed logging -->
+    <logger name="ru.tinkoff.invest.emulator.core.matching" level="DEBUG"/>
+
+    <!-- OrderBook manager - detailed logging -->
+    <logger name="ru.tinkoff.invest.emulator.core.orderbook" level="DEBUG"/>
+
+    <!-- Account manager - detailed logging -->
+    <logger name="ru.tinkoff.invest.emulator.core.state" level="DEBUG"/>
+
+    <!-- gRPC services -->
+    <logger name="ru.tinkoff.invest.emulator.grpc" level="DEBUG"/>
+
+    <!-- Web components -->
+    <logger name="ru.tinkoff.invest.emulator.web" level="DEBUG"/>
+
+    <!-- gRPC framework logging -->
+    <logger name="io.grpc" level="INFO"/>
+    <logger name="net.devh.boot.grpc" level="INFO"/>
+
+    <!-- Spring framework -->
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="org.springframework.web.socket" level="DEBUG"/>
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_FILE"/>
+    </root>
+
+</configuration>

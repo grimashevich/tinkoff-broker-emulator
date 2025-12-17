@@ -26,11 +26,14 @@ public class OrdersStreamServiceImpl extends OrdersStreamServiceImplBase {
 
     @Override
     public void orderStateStream(OrderStateStreamRequest request, StreamObserver<OrderStateStreamResponse> responseObserver) {
+        log.info("GRPC OrderStateStream: New subscription for accounts: {}", request.getAccountsList());
+
         // In request.getAccountsList() we have accounts to subscribe to.
         for (String accountId : request.getAccountsList()) {
             streamManager.addOrderStateSubscription(responseObserver, accountId);
+            log.debug("GRPC OrderStateStream: Registered observer for account {}", accountId);
         }
-        
+
         // This is Server Stream, so we don't return immediately, we keep it open.
         // But we don't have a way to detect client disconnect easily unless we wrap or ping.
         // For now, simple registration.
@@ -39,7 +42,14 @@ public class OrdersStreamServiceImpl extends OrdersStreamServiceImplBase {
     @EventListener
     public void onOrderStateChanged(OrderStateChangedEvent event) {
         Order order = event.getOrder();
-        if (order.getAccountId() == null) return;
+        if (order.getAccountId() == null) {
+            log.debug("GRPC OrderStateStream: Skipping event for order {} - no accountId", order.getId());
+            return;
+        }
+
+        log.debug("GRPC OrderStateStream: Broadcasting state change for order {} [{}], status={}, filled={}/{}",
+                order.getId(), order.getSource(), order.getStatus(),
+                order.getFilledQuantity(), order.getQuantity());
 
         OrderStateStreamResponse response = OrderStateStreamResponse.newBuilder()
                 .setOrderState(OrderStateStreamResponse.OrderState.newBuilder()

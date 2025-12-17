@@ -29,16 +29,24 @@ public class OrderBookWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         sessions.add(session);
+        log.info("WS: Client connected, sessionId={}, total sessions={}", session.getId(), sessions.size());
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         sessions.remove(session);
+        log.info("WS: Client disconnected, sessionId={}, status={}, remaining sessions={}",
+                session.getId(), status, sessions.size());
     }
 
     @EventListener
     public void handleOrderBookChange(OrderBookChangedEvent event) {
-        if (sessions.isEmpty()) return;
+        if (sessions.isEmpty()) {
+            log.trace("WS: No active sessions, skipping orderbook broadcast");
+            return;
+        }
+
+        log.debug("WS: Broadcasting orderbook update to {} sessions", sessions.size());
 
         try {
             OrderBookDto dto = OrderBookDto.builder()
@@ -63,14 +71,17 @@ public class OrderBookWebSocketHandler extends TextWebSocketHandler {
 
             // Wrap in "type/data" envelope
             String message = objectMapper.writeValueAsString(new WebSocketMessage("ORDERBOOK_UPDATE", dto));
-            
+
+            int sentCount = 0;
             for (WebSocketSession session : sessions) {
                 if (session.isOpen()) {
                     session.sendMessage(new TextMessage(message));
+                    sentCount++;
                 }
             }
+            log.trace("WS: Sent orderbook update to {} open sessions", sentCount);
         } catch (IOException e) {
-            log.error("Failed to broadcast orderbook", e);
+            log.error("WS: Failed to broadcast orderbook", e);
         }
     }
 
