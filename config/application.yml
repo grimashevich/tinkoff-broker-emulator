@@ -1,3 +1,7 @@
+grpc:
+  server:
+    port: 9090
+
 emulator:
   instrument:
     ticker: "TBRU"
@@ -6,12 +10,30 @@ emulator:
     lot: 1
     min-price-increment: 0.01
     currency: "RUB"
-  
+
   orderbook:
     initial-bid: 7.69
     initial-ask: 7.70
-    depth: 10
-  
+    depth: 20
+    # Количество уровней с каждой стороны
+    levels-count: 20
+    # Объём по лучшим ценам (2-5 млн)
+    best-price-volume-min: 2000000
+    best-price-volume-max: 5000000
+    # Объём на остальных уровнях (10k-500k)
+    other-volume-min: 10000
+    other-volume-max: 500000
+    # Заявки маркетмейкера
+    market-maker:
+      # Расстояние от bid вниз (в шагах цены): 7.69 - 12*0.01 = 7.57
+      bid-offset: 12
+      # Расстояние от ask вверх (в шагах цены): 7.70 + 6*0.01 = 7.76
+      ask-offset: 6
+      # Объём заявки маркетмейкера
+      volume: 7000000
+      # Расстояние между MM заявками: 7.76 - 7.57 = 0.19 = 19 пт (спред 1пт + 12 + 6 = 19)
+      # Для ровно 20 пт можно использовать bid-offset: 13 или ask-offset: 7
+
   account:
     id: "mock-account-001"
     initial-balance: 200000.00

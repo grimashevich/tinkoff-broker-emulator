@@ -94,11 +94,12 @@ emulator:
 
 Реализованы следующие сервисы:
 - `InstrumentsService` (`FindInstrument`)
-- `MarketDataService` (`GetOrderBook`)
+- `MarketDataService` (`GetOrderBook`, `GetTradingStatus`)
 - `MarketDataStreamService` (`MarketDataStream`)
 - `OrdersService` (`PostOrder`, `CancelOrder`, `GetOrders`, `GetMaxLots`)
 - `OrdersStreamService` (`OrderStateStream`)
-- `OperationsService` (`GetPortfolio`, `GetPositions`)
+- `OperationsService` (`GetPortfolio`, `GetPositions`, `GetWithdrawLimits`)
+- `UsersService` (`GetAccounts`, `GetInfo`)
 
 ### REST API (Web Admin)
 
@@ -130,3 +131,12 @@ emulator:
     ```bash
     ./gradlew bootRun
     ```
+
+### Порты
+
+| Запуск | gRPC порт | Web Admin порт | Описание |
+|--------|-----------|----------------|----------|
+| `./gradlew bootRun` | **9090** | 8080 | Локальная разработка (конфиг из `config/application.yml`) |
+| `docker-compose up` | 50051 | 8080 | Docker контейнер |
+
+**Примечание**: При локальном запуске (`./gradlew bootRun`) используется порт **9090** для gRPC (стандарт grpc-spring-boot-starter). Для Docker используется порт 50051 согласно docker-compose.yml.

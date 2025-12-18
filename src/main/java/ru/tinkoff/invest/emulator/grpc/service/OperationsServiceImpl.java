@@ -82,6 +82,7 @@ public class OperationsServiceImpl extends OperationsServiceImplBase {
     private PortfolioPosition mapPosition(Position p, BigDecimal currentPrice) {
         return PortfolioPosition.newBuilder()
                 .setFigi(p.getInstrumentId())
+                .setInstrumentUid(p.getInstrumentId())
                 .setInstrumentType("bond")
                 .setQuantity(GrpcMapper.toQuotation(BigDecimal.valueOf(p.getQuantity())))
                 .setAveragePositionPrice(GrpcMapper.toMoneyValue(p.getAveragePrice(), "RUB"))
@@ -107,6 +108,22 @@ public class OperationsServiceImpl extends OperationsServiceImplBase {
         GetOperationsByCursorResponse response = GetOperationsByCursorResponse.newBuilder()
                 .setHasNext(false)
                 .setNextCursor("")
+                .build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getWithdrawLimits(WithdrawLimitsRequest request, StreamObserver<WithdrawLimitsResponse> responseObserver) {
+        log.info("GRPC GetWithdrawLimits: accountId={}", request.getAccountId());
+
+        Account account = accountManager.getAccount();
+
+        log.debug("GRPC GetWithdrawLimits: balance={}", account.getBalance());
+
+        WithdrawLimitsResponse response = WithdrawLimitsResponse.newBuilder()
+                .addMoney(GrpcMapper.toMoneyValue(account.getBalance(), "RUB"))
                 .build();
 
         responseObserver.onNext(response);

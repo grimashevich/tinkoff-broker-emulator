@@ -79,10 +79,12 @@ public class OrdersServiceImpl extends OrdersServiceImplBase {
                     .setLotsRequested(request.getQuantity())
                     .setLotsExecuted(order.getFilledQuantity())
                     .setInitialOrderPrice(GrpcMapper.toMoneyValue(price.multiply(BigDecimal.valueOf(request.getQuantity())), "RUB")) // TODO currency
+                    .setInitialSecurityPrice(GrpcMapper.toMoneyValue(price, "RUB"))
                     .setExecutedOrderPrice(GrpcMapper.toMoneyValue(calculateExecutedValue(trades), "RUB"))
                     .setDirection(request.getDirection())
                     .setOrderType(request.getOrderType())
                     .setFigi(request.getInstrumentId())
+                    .setInstrumentUid(request.getInstrumentId())
                     .build();
 
 
@@ -136,9 +138,11 @@ public class OrdersServiceImpl extends OrdersServiceImplBase {
                     .setLotsExecuted(o.getFilledQuantity())
                     .setExecutionReportStatus(mapStatus(o.getStatus()))
                     .setFigi(o.getInstrumentId())
+                    .setInstrumentUid(o.getInstrumentId())
                     .setDirection(mapDirectionProto(o.getDirection()))
                     .setOrderType(mapTypeProto(o.getType()))
                     .setInitialOrderPrice(GrpcMapper.toMoneyValue(o.getPrice().multiply(BigDecimal.valueOf(o.getQuantity())), "RUB"))
+                    .setInitialSecurityPrice(GrpcMapper.toMoneyValue(o.getPrice(), "RUB"))
                     .build());
         }
 

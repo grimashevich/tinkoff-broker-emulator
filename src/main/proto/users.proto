@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package tinkoff.public.invest.api.contract.v1;
+
+option go_package = "./;investapi";
+option java_package = "ru.tinkoff.piapi.contract.v1";
+option java_multiple_files = true;
+option csharp_namespace = "Tinkoff.InvestApi.V1";
+option objc_class_prefix = "TIAPI";
+option php_namespace = "Tinkoff\\Invest\\V1";
+
+import "google/protobuf/timestamp.proto";
+
+service UsersService {
+  // Получить счета пользователя
+  rpc GetAccounts(GetAccountsRequest) returns (GetAccountsResponse);
+  // Получить информацию о пользователе
+  rpc GetInfo(GetInfoRequest) returns (GetInfoResponse);
+  // Получить маржинальные показатели по счету
+  rpc GetMarginAttributes(GetMarginAttributesRequest) returns (GetMarginAttributesResponse);
+  // Получить тариф пользователя
+  rpc GetUserTariff(GetUserTariffRequest) returns (GetUserTariffResponse);
+}
+
+message GetAccountsRequest {
+  AccountStatus status = 1; // Статус счета
+}
+
+message GetAccountsResponse {
+  repeated Account accounts = 1; // Массив счетов
+}
+
+message Account {
+  string id = 1; // Идентификатор счета
+  AccountType type = 2; // Тип счета
+  string name = 3; // Название счета
+  AccountStatus status = 4; // Статус счета
+  google.protobuf.Timestamp opened_date = 5; // Дата открытия
+  google.protobuf.Timestamp closed_date = 6; // Дата закрытия
+  AccessLevel access_level = 7; // Уровень доступа
+}
+
+enum AccountType {
+  ACCOUNT_TYPE_UNSPECIFIED = 0; // Тип не определен
+  ACCOUNT_TYPE_TINKOFF = 1; // Брокерский счет Тинькофф
+  ACCOUNT_TYPE_TINKOFF_IIS = 2; // ИИС
+  ACCOUNT_TYPE_INVEST_BOX = 3; // Инвесткопилка
+  ACCOUNT_TYPE_INVEST_FUND = 4; // Фонд
+}
+
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0; // Статус не определен
+  ACCOUNT_STATUS_NEW = 1; // Новый
+  ACCOUNT_STATUS_OPEN = 2; // Открыт
+  ACCOUNT_STATUS_CLOSED = 3; // Закрыт
+}
+
+enum AccessLevel {
+  ACCOUNT_ACCESS_LEVEL_UNSPECIFIED = 0; // Уровень доступа не определен
+  ACCOUNT_ACCESS_LEVEL_FULL_ACCESS = 1; // Полный доступ
+  ACCOUNT_ACCESS_LEVEL_READ_ONLY = 2; // Только чтение
+  ACCOUNT_ACCESS_LEVEL_NO_ACCESS = 3; // Нет доступа
+}
+
+message GetInfoRequest {}
+
+message GetInfoResponse {
+  bool prem_status = 1; // Признак премиум клиента
+  bool qual_status = 2; // Признак квалифицированного инвестора
+  repeated string qualified_for_work_with = 3; // Набор инструментов, доступных клиенту
+  string tariff = 4; // Тариф клиента
+}
+
+message GetMarginAttributesRequest {
+  string account_id = 1; // Идентификатор счета
+}
+
+message GetMarginAttributesResponse {
+  // Placeholder
+}
+
+message GetUserTariffRequest {}
+
+message GetUserTariffResponse {
+  // Placeholder
+}

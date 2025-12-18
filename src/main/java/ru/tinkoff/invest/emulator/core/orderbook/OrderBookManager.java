@@ -35,40 +35,99 @@ public class OrderBookManager {
 
     @PostConstruct
     public void init() {
-        BigDecimal initialBid = properties.getOrderbook().getInitialBid();
-        BigDecimal initialAsk = properties.getOrderbook().getInitialAsk();
+        var orderbookConfig = properties.getOrderbook();
+        BigDecimal initialBid = orderbookConfig.getInitialBid();
+        BigDecimal initialAsk = orderbookConfig.getInitialAsk();
+        BigDecimal priceIncrement = properties.getInstrument().getMinPriceIncrement();
         String instrumentId = properties.getInstrument().getUid();
 
-        // Создаём начальные заявки от маркет-мейкера (не от бота!)
-        if (initialBid != null) {
+        if (initialBid == null || initialAsk == null || priceIncrement == null) {
+            log.warn("OrderBook initialization skipped: missing bid/ask/increment");
+            return;
+        }
+
+        int levelsCount = orderbookConfig.getLevelsCount();
+        var random = new java.util.Random();
+
+        // Создаём уровни BID (от лучшего вниз)
+        for (int i = 0; i < levelsCount; i++) {
+            BigDecimal price = initialBid.subtract(priceIncrement.multiply(BigDecimal.valueOf(i)));
+            long volume = (i == 0)
+                    ? randomInRange(random, orderbookConfig.getBestPriceVolumeMin(), orderbookConfig.getBestPriceVolumeMax())
+                    : randomInRange(random, orderbookConfig.getOtherVolumeMin(), orderbookConfig.getOtherVolumeMax());
+
             Order bidOrder = Order.builder()
                     .id(UUID.randomUUID())
                     .instrumentId(instrumentId)
                     .accountId("market-maker-init")
                     .direction(OrderDirection.BUY)
                     .type(OrderType.LIMIT)
-                    .price(initialBid)
-                    .quantity(1000)  // Начальный объём
+                    .price(price)
+                    .quantity(volume)
                     .source(OrderSource.ADMIN_PANEL)
                     .build();
             addOrder(bidOrder);
         }
 
-        if (initialAsk != null) {
+        // Создаём уровни ASK (от лучшего вверх)
+        for (int i = 0; i < levelsCount; i++) {
+            BigDecimal price = initialAsk.add(priceIncrement.multiply(BigDecimal.valueOf(i)));
+            long volume = (i == 0)
+                    ? randomInRange(random, orderbookConfig.getBestPriceVolumeMin(), orderbookConfig.getBestPriceVolumeMax())
+                    : randomInRange(random, orderbookConfig.getOtherVolumeMin(), orderbookConfig.getOtherVolumeMax());
+
             Order askOrder = Order.builder()
                     .id(UUID.randomUUID())
                     .instrumentId(instrumentId)
                     .accountId("market-maker-init")
                     .direction(OrderDirection.SELL)
                     .type(OrderType.LIMIT)
-                    .price(initialAsk)
-                    .quantity(1000)
+                    .price(price)
+                    .quantity(volume)
                     .source(OrderSource.ADMIN_PANEL)
                     .build();
             addOrder(askOrder);
         }
 
-        log.info("OrderBook initialized with bid={}, ask={}", initialBid, initialAsk);
+        // Заявки маркетмейкера на большие объёмы
+        var mmConfig = orderbookConfig.getMarketMaker();
+
+        // MM Bid - на N шагов ниже лучшего bid
+        BigDecimal mmBidPrice = initialBid.subtract(priceIncrement.multiply(BigDecimal.valueOf(mmConfig.getBidOffset())));
+        Order mmBidOrder = Order.builder()
+                .id(UUID.randomUUID())
+                .instrumentId(instrumentId)
+                .accountId("market-maker-wall")
+                .direction(OrderDirection.BUY)
+                .type(OrderType.LIMIT)
+                .price(mmBidPrice)
+                .quantity(mmConfig.getVolume())
+                .source(OrderSource.ADMIN_PANEL)
+                .build();
+        addOrder(mmBidOrder);
+
+        // MM Ask - на N шагов выше лучшего ask
+        BigDecimal mmAskPrice = initialAsk.add(priceIncrement.multiply(BigDecimal.valueOf(mmConfig.getAskOffset())));
+        Order mmAskOrder = Order.builder()
+                .id(UUID.randomUUID())
+                .instrumentId(instrumentId)
+                .accountId("market-maker-wall")
+                .direction(OrderDirection.SELL)
+                .type(OrderType.LIMIT)
+                .price(mmAskPrice)
+                .quantity(mmConfig.getVolume())
+                .source(OrderSource.ADMIN_PANEL)
+                .build();
+        addOrder(mmAskOrder);
+
+        log.info("OrderBook initialized: bid={}, ask={}, levels={}, MM bid wall={} @{}, MM ask wall={} @{}",
+                initialBid, initialAsk, levelsCount,
+                mmConfig.getVolume(), mmBidPrice,
+                mmConfig.getVolume(), mmAskPrice);
+    }
+
+    private long randomInRange(java.util.Random random, long min, long max) {
+        return min + (long) (random.nextDouble() * (max - min));
     }
 
     public void clear() {

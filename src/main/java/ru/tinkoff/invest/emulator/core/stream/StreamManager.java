@@ -44,7 +44,8 @@ public class StreamManager {
     @SuppressWarnings("unchecked")
     public <T> void broadcastOrderBook(String instrumentId, T message) {
         Set<StreamObserver<?>> observers = orderBookSubscribers.get(instrumentId);
-        if (observers != null) {
+        if (observers != null && !observers.isEmpty()) {
+            log.debug("broadcastOrderBook: sending to {} observers for instrumentId={}", observers.size(), instrumentId);
             observers.forEach(obs -> {
                 try {
                     ((StreamObserver<T>) obs).onNext(message);
@@ -53,6 +54,8 @@ public class StreamManager {
                     removeSubscription(obs);
                 }
             });
+        } else {
+            log.debug("broadcastOrderBook: no observers for instrumentId={}", instrumentId);
         }
     }
 

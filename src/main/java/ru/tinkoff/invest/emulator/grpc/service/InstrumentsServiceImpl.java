@@ -39,6 +39,7 @@ public class InstrumentsServiceImpl extends InstrumentsServiceImplBase {
                     .setInstrumentType("bond")
                     .setClassCode("TQBR")
                     .setApiTradeAvailableFlag(true)
+                    .setLot(inst.getLot())
                     .build());
         } else {
             log.debug("GRPC FindInstrument: No match for query '{}'", query);

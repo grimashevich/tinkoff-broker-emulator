@@ -44,12 +44,30 @@ public class MarketDataServiceImpl extends MarketDataServiceImplBase {
         responseObserver.onCompleted();
     }
 
+    @Override
+    public void getTradingStatus(GetTradingStatusRequest request, StreamObserver<GetTradingStatusResponse> responseObserver) {
+        String instrumentId = request.hasInstrumentId() ? request.getInstrumentId() : request.getFigi();
+        log.info("GRPC GetTradingStatus: instrumentId={}", instrumentId);
+
+        GetTradingStatusResponse response = GetTradingStatusResponse.newBuilder()
+                .setFigi(instrumentId)
+                .setInstrumentUid(instrumentId)
+                .setTradingStatus(SecurityTradingStatus.SECURITY_TRADING_STATUS_NORMAL_TRADING)
+                .setLimitOrderAvailableFlag(true)
+                .setMarketOrderAvailableFlag(true)
+                .setApiTradeAvailableFlag(true)
+                .build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
     private List<Order> mapOrders(Iterable<ru.tinkoff.invest.emulator.core.model.PriceLevel> levels) {
         // Core PriceLevel contains List<Order>.
         // API Order is just Price + Quantity.
         // We need to aggregate quantity at each level?
         // My PriceLevel has `getTotalQuantity`.
-        
+
         List<Order> result = new java.util.ArrayList<>();
         for (ru.tinkoff.invest.emulator.core.model.PriceLevel level : levels) {
              result.add(Order.newBuilder()

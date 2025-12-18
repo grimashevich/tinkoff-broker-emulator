@@ -29,6 +29,19 @@ public class EmulatorProperties {
         private BigDecimal initialBid;
         private BigDecimal initialAsk;
         private int depth;
+        private int levelsCount = 20;
+        private long bestPriceVolumeMin = 2000000;
+        private long bestPriceVolumeMax = 5000000;
+        private long otherVolumeMin = 10000;
+        private long otherVolumeMax = 500000;
+        private MarketMaker marketMaker = new MarketMaker();
+    }
+
+    @Data
+    public static class MarketMaker {
+        private int bidOffset = 12;
+        private int askOffset = 6;
+        private long volume = 7000000;
     }
 
     @Data

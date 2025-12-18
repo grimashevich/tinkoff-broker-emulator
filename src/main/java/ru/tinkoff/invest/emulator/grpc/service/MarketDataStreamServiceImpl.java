@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
+import ru.tinkoff.invest.emulator.config.EmulatorProperties;
 import ru.tinkoff.invest.emulator.core.event.OrderBookChangedEvent;
 import ru.tinkoff.invest.emulator.core.orderbook.OrderBookManager;
 import ru.tinkoff.invest.emulator.core.stream.StreamManager;
@@ -13,6 +14,7 @@ import ru.tinkoff.invest.emulator.grpc.mapper.GrpcMapper;
 import ru.tinkoff.piapi.contract.v1.*;
 import ru.tinkoff.piapi.contract.v1.MarketDataStreamServiceGrpc.MarketDataStreamServiceImplBase;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,6 +26,7 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
 
     private final StreamManager streamManager;
     private final OrderBookManager orderBookManager;
+    private final EmulatorProperties properties;
 
     @Override
     public StreamObserver<MarketDataRequest> marketDataStream(StreamObserver<MarketDataResponse> responseObserver) {
@@ -48,9 +51,16 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
                                     .setSubscribeOrderBookResponse(SubscribeOrderBookResponse.newBuilder()
                                             .setTrackingId("track-" + System.currentTimeMillis())
                                             .addOrderBookSubscriptions(OrderBookSubscription.newBuilder()
-                                                    .setFigi(instr.getInstrumentId())
+                                                    .setFigi(properties.getInstrument().getFigi())
                                                     .setDepth(instr.getDepth())
                                                     .setSubscriptionStatus(SubscriptionStatus.SUBSCRIPTION_STATUS_SUCCESS)
+                                                    .setInstrumentUid(instr.getInstrumentId())
+                                                    .setStreamId("stream-" + System.currentTimeMillis())
+                                                    .setSubscriptionId(java.util.UUID.randomUUID().toString())
+                                                    .setOrderBookType(OrderBookType.ORDERBOOK_TYPE_EXCHANGE)
+                                                    .setSubscriptionAction(SubscriptionAction.SUBSCRIPTION_ACTION_SUBSCRIBE)
+                                                    .setTicker(properties.getInstrument().getTicker())
+                                                    .setClassCode("TQBR")
                                                     .build())
                                             .build())
                                     .build());
@@ -84,14 +94,28 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
         log.debug("GRPC MarketDataStream: Broadcasting OrderBook update for instrument={}, bids={}, asks={}",
                 coreBook.getInstrumentId(), coreBook.getBids().size(), coreBook.getAsks().size());
 
+        // Рассчитаем лимиты цен (±10% от текущей цены)
+        BigDecimal bestBid = orderBookManager.getBestBid();
+        BigDecimal bestAsk = orderBookManager.getBestAsk();
+        BigDecimal midPrice = bestBid != null && bestAsk != null
+                ? bestBid.add(bestAsk).divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.valueOf(7.70);
+        BigDecimal limitUp = midPrice.multiply(BigDecimal.valueOf(1.10));
+        BigDecimal limitDown = midPrice.multiply(BigDecimal.valueOf(0.90));
+
         OrderBook ob = OrderBook.newBuilder()
-                .setFigi(coreBook.getInstrumentId())
-                .setDepth(50) // Snapshot default depth
+                .setFigi(properties.getInstrument().getFigi())
+                .setDepth(50)
                 .setIsConsistent(true)
                 .setTime(GrpcMapper.toTimestamp(Instant.now()))
                 .addAllBids(mapOrders(coreBook.getBids().values()))
                 .addAllAsks(mapOrders(coreBook.getAsks().values()))
                 .setInstrumentUid(coreBook.getInstrumentId())
+                .setLimitUp(GrpcMapper.toQuotation(limitUp))
+                .setLimitDown(GrpcMapper.toQuotation(limitDown))
+                .setOrderBookType(OrderBookType.ORDERBOOK_TYPE_EXCHANGE)
+                .setTicker(properties.getInstrument().getTicker())
+                .setClassCode("TQBR")
                 .build();
 
         MarketDataResponse response = MarketDataResponse.newBuilder()
@@ -120,17 +144,34 @@ public class MarketDataStreamServiceImpl extends MarketDataStreamServiceImplBase
     public void sendPeriodicOrderBook() {
         ru.tinkoff.invest.emulator.core.model.OrderBook coreBook = orderBookManager.getSnapshot(50);
         if (coreBook == null) {
+            log.debug("sendPeriodicOrderBook: snapshot is null");
             return;
         }
+        log.debug("sendPeriodicOrderBook: broadcasting for instrumentId={}, bids={}, asks={}",
+                coreBook.getInstrumentId(), coreBook.getBids().size(), coreBook.getAsks().size());
+
+        // Рассчитаем лимиты цен (±10% от текущей цены)
+        BigDecimal bestBid = orderBookManager.getBestBid();
+        BigDecimal bestAsk = orderBookManager.getBestAsk();
+        BigDecimal midPrice = bestBid != null && bestAsk != null
+                ? bestBid.add(bestAsk).divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.valueOf(7.70);
+        BigDecimal limitUp = midPrice.multiply(BigDecimal.valueOf(1.10));
+        BigDecimal limitDown = midPrice.multiply(BigDecimal.valueOf(0.90));
 
         OrderBook ob = OrderBook.newBuilder()
-                .setFigi(coreBook.getInstrumentId())
+                .setFigi(properties.getInstrument().getFigi())
                 .setDepth(50)
                 .setIsConsistent(true)
                 .setTime(GrpcMapper.toTimestamp(Instant.now()))
                 .addAllBids(mapOrders(coreBook.getBids().values()))
                 .addAllAsks(mapOrders(coreBook.getAsks().values()))
                 .setInstrumentUid(coreBook.getInstrumentId())
+                .setLimitUp(GrpcMapper.toQuotation(limitUp))
+                .setLimitDown(GrpcMapper.toQuotation(limitDown))
+                .setOrderBookType(OrderBookType.ORDERBOOK_TYPE_EXCHANGE)
+                .setTicker(properties.getInstrument().getTicker())
+                .setClassCode("TQBR")
                 .build();
 
         MarketDataResponse response = MarketDataResponse.newBuilder()
