@@ -232,8 +232,8 @@
             direction: direction,
             orderType: type,
             price: parseFloat(price),
-            quantity: parseInt(quantity),
-            instrumentId: 'TBRU' // Hardcoded for MVP
+            quantity: parseInt(quantity)
+            // instrumentId не передаём - сервер использует uid из конфига
         };
 
         try {
