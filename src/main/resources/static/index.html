@@ -60,7 +60,8 @@
         .order-book-table th { text-align: center; color: #888; }
         .ask-row { color: var(--ask-color); }
         .bid-row { color: var(--bid-color); }
-        .price-col { font-weight: bold; }
+        .price-col { font-weight: bold; cursor: pointer; }
+        .price-col:hover { text-decoration: underline; }
         
         /* Forms */
         .form-group { margin-bottom: 15px; }
@@ -139,7 +140,7 @@
                 </div>
                 <div class="form-group" style="flex: 1;">
                     <label>Quantity</label>
-                    <input type="number" id="quantity" value="10">
+                    <input type="number" id="quantity" value="100000">
                 </div>
             </div>
             <div class="form-group">
@@ -259,6 +260,10 @@
         } catch(e) { console.error(e); }
     }
 
+    function setPrice(price) {
+        document.getElementById('price').value = price.toFixed(2);
+    }
+
     // WebSocket
     function connectWs() {
         const ws = new WebSocket(`ws://${location.host}/ws/orderbook`);
@@ -272,6 +277,8 @@
     }
 
     // Rendering
+    let priceInitialized = false;
+
     function renderOrderBook(data) {
         // Sort: Asks ascending (lowest first), Bids descending (highest first)
         // But for display: Asks should be descending (High -> Low) visually stacking up?
@@ -284,30 +291,36 @@
         // 99
         // 98
         // Bids (Green)
-        
+
         // Data comes as sorted lists usually.
         // Asks: sorted by price asc (100, 101, 102). We want to reverse for display (102, 101, 100).
-        const asks = [...data.asks].reverse(); 
+        const asks = [...data.asks].reverse();
         const bids = data.bids; // Descending (100, 99)
 
         const asksHtml = asks.map(lvl => `
             <tr class="ask-row">
                 <td>${lvl.quantity}</td>
-                <td class="price-col">${lvl.price.toFixed(2)}</td>
+                <td class="price-col" onclick="setPrice(${lvl.price})">${lvl.price.toFixed(2)}</td>
                 <td>${lvl.ordersCount > 0 ? '(' + lvl.ordersCount + ')' : ''}</td>
             </tr>
         `).join('');
-        
+
         const bidsHtml = bids.map(lvl => `
             <tr class="bid-row">
                 <td>${lvl.quantity}</td>
-                <td class="price-col">${lvl.price.toFixed(2)}</td>
+                <td class="price-col" onclick="setPrice(${lvl.price})">${lvl.price.toFixed(2)}</td>
                 <td>${lvl.ordersCount > 0 ? '(' + lvl.ordersCount + ')' : ''}</td>
             </tr>
         `).join('');
 
         document.getElementById('asks-body').innerHTML = asksHtml;
         document.getElementById('bids-body').innerHTML = bidsHtml;
+
+        // Устанавливаем цену bid по умолчанию при первой загрузке
+        if (!priceInitialized && bids.length > 0) {
+            setPrice(bids[0].price);
+            priceInitialized = true;
+        }
     }
 
     function renderOrders(orders) {
