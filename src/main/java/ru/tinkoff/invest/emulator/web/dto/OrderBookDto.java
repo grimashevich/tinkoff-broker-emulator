@@ -22,5 +22,6 @@ public class OrderBookDto {
         private BigDecimal price;
         private long quantity;
         private int ordersCount;
+        private long apiQuantity;  // Объём заявок бота (OrderSource.API)
     }
 }

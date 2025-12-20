@@ -60,8 +60,9 @@
         .order-book-table th { text-align: center; color: #888; }
         .ask-row { color: var(--ask-color); }
         .bid-row { color: var(--bid-color); }
-        .price-col { font-weight: bold; cursor: pointer; }
-        .price-col:hover { text-decoration: underline; }
+        .price-col, .vol-col { font-weight: bold; cursor: pointer; }
+        .price-col:hover, .vol-col:hover { text-decoration: underline; }
+        .api-vol { color: #ffeb3b; font-size: 0.85em; }
         
         /* Forms */
         .form-group { margin-bottom: 15px; }
@@ -264,6 +265,14 @@
         document.getElementById('price').value = price.toFixed(2);
     }
 
+    function setQuantity(quantity) {
+        document.getElementById('quantity').value = quantity;
+    }
+
+    function formatNumber(num) {
+        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+
     // WebSocket
     function connectWs() {
         const ws = new WebSocket(`ws://${location.host}/ws/orderbook`);
@@ -297,21 +306,25 @@
         const asks = [...data.asks].reverse();
         const bids = data.bids; // Descending (100, 99)
 
-        const asksHtml = asks.map(lvl => `
+        const asksHtml = asks.map(lvl => {
+            const apiVol = lvl.apiQuantity > 0 ? `<span class="api-vol"> (${formatNumber(lvl.apiQuantity)})</span>` : '';
+            return `
             <tr class="ask-row">
-                <td>${lvl.quantity}</td>
+                <td class="vol-col" onclick="setQuantity(${lvl.quantity})">${formatNumber(lvl.quantity)}${apiVol}</td>
                 <td class="price-col" onclick="setPrice(${lvl.price})">${lvl.price.toFixed(2)}</td>
                 <td>${lvl.ordersCount > 0 ? '(' + lvl.ordersCount + ')' : ''}</td>
             </tr>
-        `).join('');
+        `}).join('');
 
-        const bidsHtml = bids.map(lvl => `
+        const bidsHtml = bids.map(lvl => {
+            const apiVol = lvl.apiQuantity > 0 ? `<span class="api-vol"> (${formatNumber(lvl.apiQuantity)})</span>` : '';
+            return `
             <tr class="bid-row">
-                <td>${lvl.quantity}</td>
+                <td class="vol-col" onclick="setQuantity(${lvl.quantity})">${formatNumber(lvl.quantity)}${apiVol}</td>
                 <td class="price-col" onclick="setPrice(${lvl.price})">${lvl.price.toFixed(2)}</td>
                 <td>${lvl.ordersCount > 0 ? '(' + lvl.ordersCount + ')' : ''}</td>
             </tr>
-        `).join('');
+        `}).join('');
 
         document.getElementById('asks-body').innerHTML = asksHtml;
         document.getElementById('bids-body').innerHTML = bidsHtml;

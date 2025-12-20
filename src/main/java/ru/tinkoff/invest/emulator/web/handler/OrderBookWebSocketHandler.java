@@ -10,6 +10,8 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import ru.tinkoff.invest.emulator.core.event.OrderBookChangedEvent;
+import ru.tinkoff.invest.emulator.core.model.Order;
+import ru.tinkoff.invest.emulator.core.model.OrderSource;
 import ru.tinkoff.invest.emulator.web.dto.OrderBookDto;
 
 import java.io.IOException;
@@ -58,6 +60,10 @@ public class OrderBookWebSocketHandler extends TextWebSocketHandler {
                                     .price(e.getKey())
                                     .quantity(e.getValue().getTotalQuantity())
                                     .ordersCount(e.getValue().getOrders().size())
+                                    .apiQuantity(e.getValue().getOrders().stream()
+                                            .filter(o -> o.getSource() == OrderSource.API)
+                                            .mapToLong(Order::getRemainingQuantity)
+                                            .sum())
                                     .build())
                             .collect(Collectors.toList()))
                     .asks(event.getOrderBook().getAsks().entrySet().stream()
@@ -65,6 +71,10 @@ public class OrderBookWebSocketHandler extends TextWebSocketHandler {
                                     .price(e.getKey())
                                     .quantity(e.getValue().getTotalQuantity())
                                     .ordersCount(e.getValue().getOrders().size())
+                                    .apiQuantity(e.getValue().getOrders().stream()
+                                            .filter(o -> o.getSource() == OrderSource.API)
+                                            .mapToLong(Order::getRemainingQuantity)
+                                            .sum())
                                     .build())
                             .collect(Collectors.toList()))
                     .build();
