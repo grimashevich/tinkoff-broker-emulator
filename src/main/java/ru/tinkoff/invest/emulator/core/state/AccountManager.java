@@ -125,22 +125,34 @@ public class AccountManager {
 
     public long getMaxLots(boolean isBuy, BigDecimal currentPrice, BigDecimal instrumentPrice) {
         if (instrumentPrice == null || instrumentPrice.compareTo(BigDecimal.ZERO) == 0) {
+            log.warn("getMaxLots: instrumentPrice is null or zero, returning 0");
             return 0;
         }
 
         BigDecimal portfolioValue = getPortfolioValue(instrumentPrice);
-        
+        log.debug("getMaxLots: isBuy={}, instrumentPrice={}, portfolioValue={}", isBuy, instrumentPrice, portfolioValue);
+
         if (isBuy) {
             BigDecimal marginMult = properties.getAccount().getMarginMultiplierBuy();
+            log.debug("getMaxLots BUY: marginMultiplierBuy={}", marginMult);
+            if (marginMult == null) {
+                log.warn("getMaxLots BUY: marginMultiplierBuy is null!");
+                return 0;
+            }
             // floor(portfolioValue * marginMultiplierBuy / currentAskPrice)
             BigDecimal buyingPower = portfolioValue.multiply(marginMult);
             return buyingPower.divide(instrumentPrice, 0, java.math.RoundingMode.FLOOR).longValue();
         } else {
              BigDecimal marginMult = properties.getAccount().getMarginMultiplierSell();
+             log.debug("getMaxLots SELL: marginMultiplierSell={}", marginMult);
+             if (marginMult == null) {
+                 log.warn("getMaxLots SELL: marginMultiplierSell is null!");
+                 return 0;
+             }
              // floor(portfolioValue * marginMultiplierSell / currentBidPrice)
              BigDecimal sellingPower = portfolioValue.multiply(marginMult);
              long maxSell = sellingPower.divide(instrumentPrice, 0, java.math.RoundingMode.FLOOR).longValue();
-             
+
              // + current position?
              // If we are Long 10, can we sell 10 + maxShort?
              // Usually yes.
@@ -148,6 +160,7 @@ public class AccountManager {
              if (pos != null && pos.getQuantity() > 0) {
                  maxSell += pos.getQuantity();
              }
+             log.debug("getMaxLots SELL: sellingPower={}, maxSell={}", sellingPower, maxSell);
              return maxSell;
         }
     }
