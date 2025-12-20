@@ -95,16 +95,8 @@ public class AdminController {
         log.info("REST CreateOrder: Order {} executed with {} trades, remaining={}",
                 order.getId(), trades.size(), order.getRemainingQuantity());
 
-        // Update Bot account if Admin hit passive Bot orders
-        for (Trade trade : trades) {
-             if (trade.getPassiveOrderSource() == OrderSource.API) {
-                 boolean isAggressorBuy = order.getDirection() == OrderDirection.BUY;
-                 boolean isPassiveBuy = !isAggressorBuy;
-                 log.debug("REST CreateOrder: Updating Bot account for passive fill: {} lots @ {}",
-                         trade.getQuantity(), trade.getPrice());
-                 accountManager.updateState(trade.getInstrumentId(), trade.getQuantity(), trade.getPrice(), isPassiveBuy);
-             }
-        }
+        // NOTE: Account state is updated via TradeExecutedEvent in AccountManager.onTradeExecuted()
+        // No need to call updateState here - it would cause double counting
 
         // If Limit and remainder, add to book
         if (order.getType() == OrderType.LIMIT && !order.isFullyFilled()) {
