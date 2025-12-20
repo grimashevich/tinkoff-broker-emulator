@@ -286,3 +286,82 @@ private List<Trade> executeProRataOnLevel(
 | Одна заявка на уровне | Получает всё |
 | Все заявки по 1 лоту | Распределение по FIFO |
 | Агрессор больше всего стакана | Частичное исполнение |
+
+---
+
+## Обновление позиций после сделки
+
+После исполнения сделки (Trade) обновляется позиция участника. Логика обновления учитывает возможность шорт-позиций.
+
+### Формула обновления средней цены
+
+```java
+public void update(long quantityDelta, BigDecimal executionPrice) {
+    long newQuantity = this.quantity + quantityDelta;
+
+    // 1. Пересечение нуля (лонг → шорт или шорт → лонг)
+    if (crossingZero(quantity, newQuantity)) {
+        averagePrice = executionPrice;
+    }
+    // 2. Закрытие позиции
+    else if (newQuantity == 0) {
+        averagePrice = BigDecimal.ZERO;
+    }
+    // 3. Увеличение позиции — пересчёт средневзвешенной
+    else if (isIncreasingPosition(quantityDelta, quantity)) {
+        averagePrice = weightedAverage(quantity, averagePrice, quantityDelta, executionPrice);
+    }
+    // 4. Уменьшение позиции — средняя НЕ меняется
+
+    this.quantity = newQuantity;
+}
+```
+
+### Сценарии обновления
+
+| Сценарий | До | Операция | После | Средняя цена |
+|----------|----|---------:|-------|--------------|
+| Открытие лонга | 0 | +100 @ 7.69 | 100 | 7.69 |
+| Увеличение лонга | 100 @ 7.69 | +50 @ 7.70 | 150 | 7.693 |
+| Частичное закрытие | 100 @ 7.69 | -30 @ 7.71 | 70 | **7.69** (не меняется) |
+| Полное закрытие | 100 @ 7.69 | -100 @ 7.71 | 0 | 0 |
+| Переворот в шорт | 100 @ 7.69 | -150 @ 7.71 | -50 | **7.71** |
+| Открытие шорта | 0 | -100 @ 7.71 | -100 | 7.71 |
+| Увеличение шорта | -100 @ 7.71 | -50 @ 7.72 | -150 | 7.713 |
+| Закрытие шорта | -100 @ 7.71 | +100 @ 7.69 | 0 | 0 |
+
+### Важные нюансы
+
+1. **quantityDelta положительный для покупки, отрицательный для продажи**
+2. **Средняя цена пересчитывается только при увеличении абсолютного размера позиции**
+3. **При пересечении нуля новая средняя = цена исполнения последней сделки**
+4. **Округление**: 9 знаков после запятой (RoundingMode.HALF_UP)
+
+---
+
+## Trade модель
+
+При исполнении заявки создаётся объект Trade:
+
+```java
+class Trade {
+    UUID id;
+    String instrumentId;
+    UUID aggressorOrderId;        // Кто инициировал сделку
+    UUID passiveOrderId;          // Чья заявка была в стакане
+    String aggressorAccountId;
+    String passiveAccountId;
+    OrderSource aggressorOrderSource;  // API или ADMIN_PANEL
+    OrderSource passiveOrderSource;
+    OrderDirection aggressorDirection; // BUY или SELL
+    BigDecimal price;
+    long quantity;
+    Instant timestamp;
+}
+```
+
+**AccountManager** обновляет счёт только если хотя бы одна сторона сделки имеет `OrderSource.API`.
+
+---
+
+_Последнее обновление: 2025-12-20_

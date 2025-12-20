@@ -1,142 +1,204 @@
 # Tinkoff Broker Emulator
 
-Мок-сервер для эмуляции T-Invest API (Тинькофф Брокер). Сервер предназначен для тестирования торговых ботов без подключения к реальной бирже.
+Мок-сервер для эмуляции T-Invest API (Тинькофф Брокер). Позволяет разрабатывать и тестировать торговых ботов без подключения к реальной бирже.
+
+## Особенности
+
+- Эмулирует один инструмент — **TBRU** (облигационный ETF)
+- **Pro-Rata** алгоритм matching (как на реальной бирже TBRU)
+- Поддержка **шорт-позиций** (отрицательный quantity в Position)
+- Event-driven архитектура для real-time обновлений
+- Web Admin UI для ручного управления стаканом
 
 ## Оглавление
+
 - [Технический стек](#технический-стек)
-- [Быстрый старт с Docker](#быстрый-старт-с-docker)
+- [Быстрый старт](#быстрый-старт)
 - [Конфигурация](#конфигурация)
 - [API](#api)
-  - [gRPC API](#grpc-api)
-  - [REST API (Web Admin)](#rest-api-web-admin)
+- [Ключевые концепции](#ключевые-концепции)
+- [Документация](#документация)
 - [Локальная разработка](#локальная-разработка)
 
 ## Технический стек
 
 - **Java**: 21
 - **Spring Boot**: 3.3.1
-- **gRPC**: для реализации API
+- **gRPC**: net.devh:grpc-server-spring-boot-starter
 - **Gradle**: система сборки
 - **Docker Compose**: для запуска
 
-## Быстрый старт с Docker
+## Быстрый старт
 
-Это рекомендуемый способ запуска эмулятора.
+### Docker (рекомендуется)
 
-1.  **Соберите и запустите контейнер:**
+```bash
+# Сборка и запуск
+docker-compose up --build
 
-    ```bash
-    docker-compose up --build
-    ```
+# Эмулятор доступен:
+# - gRPC: localhost:50051
+# - Web Admin: http://localhost:8080
 
-2.  **Эмулятор будет доступен по адресам:**
-    -   **gRPC**: `localhost:50051`
-    -   **Web Admin UI**: `http://localhost:8080`
+# Остановка
+docker-compose down
+```
 
-3.  **Остановка эмулятора:**
+### Локальный запуск
 
-    ```bash
-    docker-compose down
-    ```
+```bash
+# Сборка + тесты
+./gradlew build
+
+# Запуск
+./gradlew bootRun
+
+# Эмулятор доступен:
+# - gRPC: localhost:9090
+# - Web Admin: http://localhost:8080
+```
 
 ## Конфигурация
 
-Конфигурация эмулятора находится в файле `config/application.yml`. Вы можете изменять этот файл для настройки параметров инструмента, стакана и счёта.
+Файл `config/application.yml`:
 
-Пример `config/application.yml`:
 ```yaml
-spring:
-  main:
-    banner-mode: "off"
-  application:
-    name: tinkoff-broker-emulator
-
-# gRPC Server
-grpc:
-  server:
-    port: 50051
-
-# Web Server
-server:
-  port: 8080
-
 emulator:
-  # Настройки эмулируемого инструмента
+  # Эмулируемый инструмент
   instrument:
     ticker: "TBRU"
-    uid: "e8acd2fb-6de6-4ea4-9bfb-0daad9b2ed7b"
+    uid: "e8acd2fb-6de6-4ea4-9bfb-0daad9b2ed7b"  # Используется везде как instrumentId
     figi: "TCS60A1039N1"
     lot: 1
     min-price-increment: 0.01
     currency: "RUB"
-  
+
   # Начальные настройки стакана
   orderbook:
     initial-bid: 7.69
     initial-ask: 7.70
     depth: 10
-  
+    levels-count: 20              # Кол-во уровней при инициализации
+    best-price-volume-min: 2000000
+    best-price-volume-max: 5000000
+    other-volume-min: 10000
+    other-volume-max: 500000
+    market-maker:
+      bid-offset: 12              # Уровень для большой bid-стены
+      ask-offset: 6               # Уровень для большой ask-стены
+      volume: 7000000             # Объём стены
+
   # Настройки счёта бота
   account:
     id: "mock-account-001"
     initial-balance: 200000.00
-    margin-multiplier-buy: 7.0
-    margin-multiplier-sell: 7.1
+    margin-multiplier-buy: 7.0    # Множитель для GetMaxLots BUY
+    margin-multiplier-sell: 7.1   # Множитель для GetMaxLots SELL
 ```
 
 ## API
 
 ### gRPC API
 
-- **Адрес**: `localhost:50051` (без TLS)
+- **Адрес**: `localhost:50051` (Docker) / `localhost:9090` (локально)
+- **TLS**: Отключён (plaintext)
 - **Авторизация**: `Authorization: Bearer <любой_токен>`
-- **Proto-контракты**: См. официальную [документацию T-Invest API](https://invest-public-api.tinkoff.ru/docs/).
 
-Реализованы следующие сервисы:
-- `InstrumentsService` (`FindInstrument`)
-- `MarketDataService` (`GetOrderBook`, `GetTradingStatus`)
-- `MarketDataStreamService` (`MarketDataStream`)
-- `OrdersService` (`PostOrder`, `CancelOrder`, `GetOrders`, `GetMaxLots`)
-- `OrdersStreamService` (`OrderStateStream`)
-- `OperationsService` (`GetPortfolio`, `GetPositions`, `GetWithdrawLimits`)
-- `UsersService` (`GetAccounts`, `GetInfo`)
+**Реализованные сервисы:**
+
+| Сервис | Методы |
+|--------|--------|
+| `InstrumentsService` | `FindInstrument` |
+| `MarketDataService` | `GetOrderBook` |
+| `MarketDataStreamService` | `MarketDataStream` (bidirectional) |
+| `OrdersService` | `PostOrder`, `CancelOrder`, `GetOrders`, `GetMaxLots` |
+| `OrdersStreamService` | `OrderStateStream` (server stream) |
+| `OperationsService` | `GetPortfolio`, `GetPositions`, `GetWithdrawLimits` |
+| `UsersService` | `GetAccounts`, `GetInfo` |
 
 ### REST API (Web Admin)
 
 - **Адрес**: `http://localhost:8080`
 
-| Метод  | Путь                | Описание                                  |
-|--------|---------------------|-------------------------------------------|
-| `GET`  | `/api/orderbook`    | Получить текущее состояние стакана.       |
-| `GET`  | `/api/orders`       | Получить список всех активных заявок.     |
-| `POST` | `/api/orders`       | Создать заявку (от имени участника рынка).|
-| `DELETE`| `/api/orders/{id}` | Отменить заявку.                          |
-| `GET`  | `/api/account`      | Получить информацию о счёте бота.          |
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET` | `/api/orderbook` | Текущий стакан |
+| `GET` | `/api/orders` | Список всех заявок |
+| `POST` | `/api/orders` | Создать заявку (от имени рынка) |
+| `DELETE` | `/api/orders/{id}` | Отменить заявку |
+| `GET` | `/api/account` | Информация о счёте бота |
 
 ### WebSocket
 
 - **Адрес**: `ws://localhost:8080/ws/orderbook`
-- **Сообщение**: Рассылает обновления стакана в формате JSON.
+- Real-time обновления стакана в формате JSON
+
+## Ключевые концепции
+
+### OrderSource — источник заявки
+
+```java
+enum OrderSource {
+    API,          // Заявки бота через gRPC → влияют на Account
+    ADMIN_PANEL   // Заявки "рынка" через Web UI → НЕ влияют на Account
+}
+```
+
+**Важно:** Баланс и позиции обновляются ТОЛЬКО для сделок, где одна из сторон — `OrderSource.API`.
+
+### Шорт-позиции
+
+`Position.quantity` может быть отрицательным. Правила обновления средней цены:
+- **Увеличение позиции** → пересчёт средневзвешенной
+- **Уменьшение позиции** → средняя не меняется
+- **Пересечение нуля** → средняя = цена исполнения
+
+### Pro-Rata Matching
+
+Объём распределяется пропорционально размеру заявок с floor-округлением, остатки по FIFO. Подробности: `docs/MATCHING_ENGINE.md`
+
+## Документация
+
+| Файл | Описание |
+|------|----------|
+| `CLAUDE.md` | Руководство для AI-агентов, архитектура, нюансы |
+| `docs/ARCHITECTURE.md` | Диаграммы компонентов, потоки данных, thread-safety |
+| `docs/API_SPEC.md` | Полная спецификация gRPC и REST API |
+| `docs/MATCHING_ENGINE.md` | Алгоритм Pro-Rata с примерами |
+| `docs/ROADMAP.md` | История разработки и изменений |
 
 ## Локальная разработка
 
-1.  **Запустите тесты:**
+```bash
+# Все тесты
+./gradlew test
 
-    ```bash
-    ./gradlew test
-    ```
+# Только Pro-Rata тесты
+./gradlew test --tests "*Pro*"
 
-2.  **Запустите приложение:**
-
-    ```bash
-    ./gradlew bootRun
-    ```
+# Запуск с hot-reload
+./gradlew bootRun
+```
 
 ### Порты
 
-| Запуск | gRPC порт | Web Admin порт | Описание |
-|--------|-----------|----------------|----------|
-| `./gradlew bootRun` | **9090** | 8080 | Локальная разработка (конфиг из `config/application.yml`) |
-| `docker-compose up` | 50051 | 8080 | Docker контейнер |
+| Запуск | gRPC | Web Admin |
+|--------|------|-----------|
+| `./gradlew bootRun` | 9090 | 8080 |
+| `docker-compose up` | 50051 | 8080 |
 
-**Примечание**: При локальном запуске (`./gradlew bootRun`) используется порт **9090** для gRPC (стандарт grpc-spring-boot-starter). Для Docker используется порт 50051 согласно docker-compose.yml.
+### Тесты
+
+- 21 тест (7 integration, 14 unit)
+- E2E тест требует Docker
+
+## Известные ограничения
+
+1. **Нет персистентности** — состояние теряется при перезапуске
+2. **Один инструмент** — только TBRU
+3. **Нет проверки лимитов** — заявки всегда принимаются
+4. **Упрощённый P&L** — комиссии не учитываются
+
+---
+
+_Версия: 1.0.0 | Обновлено: 2025-12-20_
