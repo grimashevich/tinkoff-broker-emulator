@@ -137,6 +137,15 @@ public class AdminController {
         return account;
     }
 
+    @PostMapping("/reset")
+    public ResponseEntity<String> resetEmulator() {
+        log.info("REST Reset: Resetting emulator to initial state");
+        accountManager.reset();
+        orderBookManager.reset();
+        log.info("REST Reset: Emulator reset complete");
+        return ResponseEntity.ok("Emulator reset to initial state");
+    }
+
     private OrderDto mapOrder(Order order) {
         return OrderDto.builder()
                 .id(order.getId().toString())

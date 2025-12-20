@@ -33,6 +33,15 @@ public class AccountManager {
         log.info("Initialized account {} with balance {}", account.getId(), account.getBalance());
     }
 
+    /**
+     * Сброс состояния аккаунта к начальным значениям.
+     */
+    public synchronized void reset() {
+        account.setBalance(properties.getAccount().getInitialBalance());
+        account.getPositions().clear();
+        log.info("Account reset: id={}, balance={}", account.getId(), account.getBalance());
+    }
+
     @EventListener
     public void onTradeExecuted(TradeExecutedEvent event) {
         Trade trade = event.getTrade();

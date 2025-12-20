@@ -97,9 +97,31 @@
         
         .right-panel { display: flex; flex-direction: column; gap: 20px; }
         .account-info { font-family: monospace; }
+
+        /* Reset Button */
+        .reset-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #ff9800;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+            z-index: 1000;
+            transition: background-color 0.2s;
+        }
+        .reset-btn:hover { background-color: #ffa726; }
+        .reset-btn:active { background-color: #f57c00; }
+        .reset-btn:disabled { background-color: #666; cursor: not-allowed; }
     </style>
 </head>
 <body>
+
+<button class="reset-btn" onclick="resetEmulator()">Reset Emulator</button>
 
 <div class="container">
     <!-- Left: Order Book -->
@@ -259,6 +281,32 @@
             await fetch(`/api/orders/${id}`, { method: 'DELETE' });
             fetchOrders();
         } catch(e) { console.error(e); }
+    }
+
+    async function resetEmulator() {
+        if (!confirm('Reset emulator to initial state? All orders and positions will be cleared.')) {
+            return;
+        }
+        const btn = document.querySelector('.reset-btn');
+        btn.disabled = true;
+        btn.textContent = 'Resetting...';
+        try {
+            const res = await fetch('/api/reset', { method: 'POST' });
+            if (res.ok) {
+                priceInitialized = false; // Reset price initialization flag
+                fetchOrderBook();
+                fetchOrders();
+                fetchAccount();
+            } else {
+                alert('Failed to reset emulator');
+            }
+        } catch(e) {
+            console.error(e);
+            alert('Failed to reset emulator');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Reset Emulator';
+        }
     }
 
     function setPrice(price) {

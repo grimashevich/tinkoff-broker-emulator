@@ -143,6 +143,24 @@ public class OrderBookManager {
         }
     }
 
+    /**
+     * Сброс стакана к начальному состоянию: очистка + реинициализация.
+     */
+    public void reset() {
+        lock.writeLock().lock();
+        try {
+            orderBook.getBids().clear();
+            orderBook.getAsks().clear();
+            orderIndex.clear();
+            log.info("OrderBook reset: cleared all orders");
+        } finally {
+            lock.writeLock().unlock();
+        }
+        // init() вызываем вне блокировки, т.к. он сам берёт write lock в addOrder()
+        init();
+        log.info("OrderBook reset: reinitialized with market-maker orders");
+    }
+
     public void addOrder(Order order) {
         lock.writeLock().lock();
         try {
